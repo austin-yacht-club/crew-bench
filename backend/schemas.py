@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     bio: Optional[str] = None
     weight: Optional[int] = None
     certifications: Optional[str] = None
+    profile_picture: Optional[str] = None
     allow_email_contact: Optional[bool] = True
     allow_phone_contact: Optional[bool] = False
     contact_preference: Optional[str] = "email"
@@ -30,6 +31,7 @@ class UserUpdate(BaseModel):
     bio: Optional[str] = None
     weight: Optional[int] = None
     certifications: Optional[str] = None
+    profile_picture: Optional[str] = None
     allow_email_contact: Optional[bool] = None
     allow_phone_contact: Optional[bool] = None
     contact_preference: Optional[str] = None

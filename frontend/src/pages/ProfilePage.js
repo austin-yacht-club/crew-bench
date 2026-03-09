@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -18,12 +18,15 @@ import {
   FormControlLabel,
   Checkbox,
   Divider,
+  IconButton,
+  Badge,
 } from '@mui/material';
-import { Person, Save, ContactMail } from '@mui/icons-material';
+import { Person, Save, ContactMail, PhotoCamera, Delete } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 
 const ProfilePage = () => {
   const { user, updateUser } = useAuth();
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -32,6 +35,7 @@ const ProfilePage = () => {
     bio: user?.bio || '',
     weight: user?.weight || '',
     certifications: user?.certifications || '',
+    profile_picture: user?.profile_picture || null,
     allow_email_contact: user?.allow_email_contact ?? true,
     allow_phone_contact: user?.allow_phone_contact ?? false,
     contact_preference: user?.contact_preference || 'email',
@@ -46,6 +50,58 @@ const ProfilePage = () => {
       ...formData, 
       [name]: type === 'checkbox' ? checked : value 
     });
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Image must be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSize = 200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setFormData({ ...formData, profile_picture: resizedDataUrl });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePicture = () => {
+    setFormData({ ...formData, profile_picture: null });
   };
 
   const handleSubmit = async (e) => {
@@ -94,18 +150,59 @@ const ProfilePage = () => {
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 4 }}>
-              <Avatar
-                sx={{
-                  width: 100,
-                  height: 100,
-                  fontSize: 40,
-                  bgcolor: 'primary.main',
-                  mx: 'auto',
-                  mb: 2,
-                }}
-              >
-                {user?.name?.charAt(0).toUpperCase()}
-              </Avatar>
+              <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
+                <Badge
+                  overlap="circular"
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  badgeContent={
+                    <Box>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
+                      />
+                      <IconButton
+                        sx={{
+                          bgcolor: 'primary.main',
+                          color: 'white',
+                          '&:hover': { bgcolor: 'primary.dark' },
+                          width: 36,
+                          height: 36,
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <PhotoCamera sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Box>
+                  }
+                >
+                  <Avatar
+                    src={formData.profile_picture || undefined}
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      fontSize: 48,
+                      bgcolor: 'primary.main',
+                    }}
+                  >
+                    {!formData.profile_picture && user?.name?.charAt(0).toUpperCase()}
+                  </Avatar>
+                </Badge>
+              </Box>
+              {formData.profile_picture && (
+                <Box sx={{ mb: 2 }}>
+                  <Button
+                    size="small"
+                    color="error"
+                    startIcon={<Delete />}
+                    onClick={handleRemovePicture}
+                  >
+                    Remove Photo
+                  </Button>
+                </Box>
+              )}
               <Typography variant="h6">{user?.name}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 {user?.email}

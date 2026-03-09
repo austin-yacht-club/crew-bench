@@ -52,6 +52,7 @@ class User(Base):
     bio = Column(Text)
     weight = Column(Integer)  # Important for sailboat balance
     certifications = Column(Text)  # Sailing certifications
+    profile_picture = Column(Text)  # Base64 encoded profile picture
     allow_email_contact = Column(Boolean, default=True)
     allow_phone_contact = Column(Boolean, default=False)
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
