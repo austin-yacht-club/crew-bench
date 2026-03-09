@@ -287,3 +287,55 @@ class SkipperCommitment(SkipperCommitmentBase):
     
     class Config:
         from_attributes = True
+
+
+class CrewRatingCreate(BaseModel):
+    crew_id: int
+    event_id: Optional[int] = None
+    boat_id: Optional[int] = None
+    rating: int  # 1-5
+    comment: Optional[str] = None
+
+
+class CrewRating(CrewRatingCreate):
+    id: int
+    rater_id: int
+    created_at: datetime
+    rater: Optional[User] = None
+    crew: Optional[User] = None
+    event: Optional[Event] = None
+    boat: Optional[Boat] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class CrewRatingSummary(BaseModel):
+    crew_id: int
+    average_rating: float
+    count: int
+
+
+class BoatRatingCreate(BaseModel):
+    boat_id: int
+    event_id: Optional[int] = None
+    rating: int  # 1-5
+    comment: Optional[str] = None
+
+
+class BoatRating(BoatRatingCreate):
+    id: int
+    rater_id: int
+    created_at: datetime
+    rater: Optional[User] = None
+    boat: Optional[Boat] = None
+    event: Optional[Event] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class BoatRatingSummary(BaseModel):
+    boat_id: int
+    average_rating: float
+    count: int

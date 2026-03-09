@@ -25,9 +25,12 @@ import {
   Checkbox,
 } from '@mui/material';
 import { People, Send, Event as EventIcon, PlaylistAdd } from '@mui/icons-material';
-import { eventsAPI, boatsAPI, crewRequestsAPI, seriesAPI } from '../services/api';
+import { eventsAPI, boatsAPI, crewRequestsAPI, seriesAPI, crewRatingsAPI } from '../services/api';
+import { useAuth } from '../services/AuthContext';
+import StarRating from '../components/StarRating';
 
 const FindCrewPage = () => {
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [boats, setBoats] = useState([]);
   const [seriesList, setSeriesList] = useState([]);
@@ -35,6 +38,7 @@ const FindCrewPage = () => {
   const [selectedEvent, setSelectedEvent] = useState('');
   const [selectedSeries, setSelectedSeries] = useState('');
   const [selectedBoat, setSelectedBoat] = useState('');
+  const [crewRatingSummaries, setCrewRatingSummaries] = useState({});
   const [availableCrew, setAvailableCrew] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -82,6 +86,24 @@ const FindCrewPage = () => {
     try {
       const response = await eventsAPI.getAvailableCrew(selectedEvent);
       setAvailableCrew(response.data);
+      const isSkipperOrAdmin = user?.role === 'skipper' || user?.role === 'admin' || user?.is_admin;
+      if (isSkipperOrAdmin && response.data?.length > 0) {
+        const crewIds = [...new Set(response.data.map(a => a.crew?.id).filter(Boolean))];
+        if (crewIds.length > 0) {
+          try {
+            const sumRes = await crewRatingsAPI.getSummaries(crewIds);
+            const byId = {};
+            sumRes.data.forEach(s => { byId[s.crew_id] = s; });
+            setCrewRatingSummaries(byId);
+          } catch {
+            setCrewRatingSummaries({});
+          }
+        } else {
+          setCrewRatingSummaries({});
+        }
+      } else {
+        setCrewRatingSummaries({});
+      }
     } catch (err) {
       setError('Failed to load available crew');
     }
@@ -250,13 +272,23 @@ const FindCrewPage = () => {
                     <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
                       {availability.crew?.name?.charAt(0).toUpperCase()}
                     </Avatar>
-                    <Box>
+                    <Box sx={{ flex: 1 }}>
                       <Typography variant="h6">{availability.crew?.name}</Typography>
-                      <Chip
-                        label={availability.crew?.experience_level || 'beginner'}
-                        size="small"
-                        color={experienceColor(availability.crew?.experience_level)}
-                      />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip
+                          label={availability.crew?.experience_level || 'beginner'}
+                          size="small"
+                          color={experienceColor(availability.crew?.experience_level)}
+                        />
+                        {(user?.role === 'skipper' || user?.is_admin) && availability.crew?.id && crewRatingSummaries[availability.crew.id]?.count > 0 && (
+                          <StarRating
+                            value={crewRatingSummaries[availability.crew.id].average_rating}
+                            count={crewRatingSummaries[availability.crew.id].count}
+                            size="small"
+                            displayOnly
+                          />
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                   {availability.crew?.weight && (

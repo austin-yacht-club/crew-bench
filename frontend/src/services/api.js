@@ -99,6 +99,20 @@ export const skipperCommitmentsAPI = {
   cancel: (id) => api.delete(`/skipper-commitments/${id}`),
 };
 
+export const crewRatingsAPI = {
+  create: (data) => api.post('/crew-ratings', data),
+  getSummary: (crewId) => api.get(`/crew-ratings/summary/${crewId}`),
+  getSummaries: (crewIds) => api.get('/crew-ratings/summaries', { params: { crew_ids: crewIds.join(',') } }),
+  getForCrew: (crewId) => api.get(`/crew-ratings/for-crew/${crewId}`),
+};
+
+export const boatRatingsAPI = {
+  create: (data) => api.post('/boat-ratings', data),
+  getSummary: (boatId) => api.get(`/boat-ratings/summary/${boatId}`),
+  getSummaries: (boatIds) => api.get('/boat-ratings/summaries', { params: { boat_ids: boatIds.join(',') } }),
+  getForBoat: (boatId) => api.get(`/boat-ratings/for-boat/${boatId}`),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),

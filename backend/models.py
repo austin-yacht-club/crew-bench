@@ -199,3 +199,39 @@ class SkipperCommitment(Base):
     skipper = relationship("User")
     boat = relationship("Boat")
     event = relationship("Event")
+
+
+class CrewRating(Base):
+    """Skipper rates crew (viewable by skippers)."""
+    __tablename__ = "crew_ratings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    rater_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # skipper
+    crew_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=True)
+    boat_id = Column(Integer, ForeignKey("boats.id"), nullable=True)
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    rater = relationship("User", foreign_keys=[rater_id])
+    crew = relationship("User", foreign_keys=[crew_id])
+    event = relationship("Event")
+    boat = relationship("Boat")
+
+
+class BoatRating(Base):
+    """Crew rates boat (viewable by crew)."""
+    __tablename__ = "boat_ratings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    rater_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # crew
+    boat_id = Column(Integer, ForeignKey("boats.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=True)
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    rater = relationship("User")
+    boat = relationship("Boat")
+    event = relationship("Event")

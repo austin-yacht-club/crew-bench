@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from database import engine, get_db, Base
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating
 import schemas
 from auth import (
     get_password_hash,
@@ -828,6 +828,195 @@ def withdraw_from_request(
     db.commit()
     db.refresh(crew_request)
     return crew_request
+
+
+# Crew Ratings (skippers rate crew; viewable by skippers)
+@app.post("/api/crew-ratings", response_model=schemas.CrewRating)
+def create_crew_rating(
+    data: schemas.CrewRatingCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Skipper rates a crew member (must have sailed with them as skipper)."""
+    if not data.boat_id and not current_user.is_admin:
+        raise HTTPException(status_code=400, detail="boat_id is required")
+    boat = db.query(Boat).filter(Boat.id == data.boat_id).first() if data.boat_id else None
+    if data.boat_id and (not boat or (boat.owner_id != current_user.id and not current_user.is_admin)):
+        raise HTTPException(status_code=403, detail="You can only rate crew from your own boat")
+    if data.rating < 1 or data.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+    if data.crew_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot rate yourself")
+    # Optionally require they had an accepted request together
+    existing = db.query(CrewRating).filter(
+        CrewRating.rater_id == current_user.id,
+        CrewRating.crew_id == data.crew_id,
+        CrewRating.event_id == data.event_id,
+        CrewRating.boat_id == data.boat_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already rated this crew for this event/boat")
+    rating = CrewRating(
+        rater_id=current_user.id,
+        crew_id=data.crew_id,
+        event_id=data.event_id,
+        boat_id=data.boat_id,
+        rating=data.rating,
+        comment=data.comment
+    )
+    db.add(rating)
+    db.commit()
+    db.refresh(rating)
+    return rating
+
+
+@app.get("/api/crew-ratings/summary/{crew_id}", response_model=schemas.CrewRatingSummary)
+def get_crew_rating_summary(
+    crew_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get average rating and count for a crew member. Skippers and admins only."""
+    if current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only skippers can view crew ratings")
+    from sqlalchemy import func
+    row = db.query(
+        func.avg(CrewRating.rating).label("avg"),
+        func.count(CrewRating.id).label("count")
+    ).filter(CrewRating.crew_id == crew_id).first()
+    return schemas.CrewRatingSummary(
+        crew_id=crew_id,
+        average_rating=round(float(row.avg or 0), 1),
+        count=int(row.count or 0)
+    )
+
+
+@app.get("/api/crew-ratings/for-crew/{crew_id}", response_model=List[schemas.CrewRating])
+def get_crew_ratings(
+    crew_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List ratings for a crew member. Skippers and admins only."""
+    if current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only skippers can view crew ratings")
+    ratings = db.query(CrewRating).options(
+        joinedload(CrewRating.rater),
+        joinedload(CrewRating.event),
+        joinedload(CrewRating.boat)
+    ).filter(CrewRating.crew_id == crew_id).order_by(CrewRating.created_at.desc()).all()
+    return ratings
+
+
+@app.get("/api/crew-ratings/summaries", response_model=List[schemas.CrewRatingSummary])
+def get_crew_rating_summaries(
+    crew_ids: str = Query(..., description="Comma-separated crew IDs"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get rating summaries for multiple crew. Skippers and admins only."""
+    if current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only skippers can view crew ratings")
+    from sqlalchemy import func
+    ids = [int(x) for x in crew_ids.split(",") if x.strip()]
+    if not ids:
+        return []
+    rows = db.query(
+        CrewRating.crew_id,
+        func.avg(CrewRating.rating).label("avg"),
+        func.count(CrewRating.id).label("count")
+    ).filter(CrewRating.crew_id.in_(ids)).group_by(CrewRating.crew_id).all()
+    by_id = {r.crew_id: schemas.CrewRatingSummary(crew_id=r.crew_id, average_rating=round(float(r.avg), 1), count=int(r.count)) for r in rows}
+    return [by_id.get(i, schemas.CrewRatingSummary(crew_id=i, average_rating=0.0, count=0)) for i in ids]
+
+
+# Boat Ratings (crew rate boats; viewable by crew)
+@app.post("/api/boat-ratings", response_model=schemas.BoatRating)
+def create_boat_rating(
+    data: schemas.BoatRatingCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Crew rates a boat (should have sailed on it)."""
+    if data.rating < 1 or data.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+    existing = db.query(BoatRating).filter(
+        BoatRating.rater_id == current_user.id,
+        BoatRating.boat_id == data.boat_id,
+        BoatRating.event_id == data.event_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already rated this boat for this event")
+    rating = BoatRating(
+        rater_id=current_user.id,
+        boat_id=data.boat_id,
+        event_id=data.event_id,
+        rating=data.rating,
+        comment=data.comment
+    )
+    db.add(rating)
+    db.commit()
+    db.refresh(rating)
+    return rating
+
+
+@app.get("/api/boat-ratings/summary/{boat_id}", response_model=schemas.BoatRatingSummary)
+def get_boat_rating_summary(
+    boat_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get average rating and count for a boat. Crew and admins can view."""
+    if current_user.role != "crew" and current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only crew can view boat ratings")
+    from sqlalchemy import func
+    row = db.query(
+        func.avg(BoatRating.rating).label("avg"),
+        func.count(BoatRating.id).label("count")
+    ).filter(BoatRating.boat_id == boat_id).first()
+    return schemas.BoatRatingSummary(
+        boat_id=boat_id,
+        average_rating=round(float(row.avg or 0), 1),
+        count=int(row.count or 0)
+    )
+
+
+@app.get("/api/boat-ratings/for-boat/{boat_id}", response_model=List[schemas.BoatRating])
+def get_boat_ratings(
+    boat_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List ratings for a boat. Crew and admins can view."""
+    if current_user.role != "crew" and current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only crew can view boat ratings")
+    ratings = db.query(BoatRating).options(
+        joinedload(BoatRating.rater),
+        joinedload(BoatRating.event)
+    ).filter(BoatRating.boat_id == boat_id).order_by(BoatRating.created_at.desc()).all()
+    return ratings
+
+
+@app.get("/api/boat-ratings/summaries", response_model=List[schemas.BoatRatingSummary])
+def get_boat_rating_summaries(
+    boat_ids: str = Query(..., description="Comma-separated boat IDs"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get rating summaries for multiple boats. Crew and admins can view."""
+    if current_user.role != "crew" and current_user.role != "skipper" and current_user.role != "admin" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only crew can view boat ratings")
+    from sqlalchemy import func
+    ids = [int(x) for x in boat_ids.split(",") if x.strip()]
+    if not ids:
+        return []
+    rows = db.query(
+        BoatRating.boat_id,
+        func.avg(BoatRating.rating).label("avg"),
+        func.count(BoatRating.id).label("count")
+    ).filter(BoatRating.boat_id.in_(ids)).group_by(BoatRating.boat_id).all()
+    by_id = {r.boat_id: schemas.BoatRatingSummary(boat_id=r.boat_id, average_rating=round(float(r.avg), 1), count=int(r.count)) for r in rows}
+    return [by_id.get(i, schemas.BoatRatingSummary(boat_id=i, average_rating=0.0, count=0)) for i in ids]
 
 
 # Series Crew Request Routes

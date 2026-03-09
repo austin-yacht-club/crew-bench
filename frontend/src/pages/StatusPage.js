@@ -35,8 +35,9 @@ import {
   Sailing,
 } from '@mui/icons-material';
 import { format, isFuture, isPast } from 'date-fns';
-import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI } from '../services/api';
+import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI, boatRatingsAPI, crewRatingsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
+import StarRating from '../components/StarRating';
 
 const StatusPage = () => {
   const { user } = useAuth();
@@ -53,10 +54,42 @@ const StatusPage = () => {
   const [selectedCommitment, setSelectedCommitment] = useState(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [boatRatingSummaries, setBoatRatingSummaries] = useState({});
+  const [crewRatingSummaries, setCrewRatingSummaries] = useState({});
+  const [rateBoatDialogOpen, setRateBoatDialogOpen] = useState(false);
+  const [rateCrewDialogOpen, setRateCrewDialogOpen] = useState(false);
+  const [rateTarget, setRateTarget] = useState(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const acceptedReceived = receivedRequests.filter(r => r.status === 'accepted');
+    const acceptedSent = sentRequests.filter(r => r.status === 'accepted');
+    const boatIds = [...new Set(acceptedReceived.map(r => r.boat?.id).filter(Boolean))];
+    const crewIds = [...new Set(acceptedSent.map(r => r.crew?.id).filter(Boolean))];
+    if (boatIds.length > 0 && (user?.role === 'crew' || user?.role === 'skipper' || user?.is_admin)) {
+      boatRatingsAPI.getSummaries(boatIds).then(res => {
+        const byId = {};
+        res.data.forEach(s => { byId[s.boat_id] = s; });
+        setBoatRatingSummaries(byId);
+      }).catch(() => setBoatRatingSummaries({}));
+    } else {
+      setBoatRatingSummaries({});
+    }
+    if (crewIds.length > 0 && (user?.role === 'skipper' || user?.is_admin)) {
+      crewRatingsAPI.getSummaries(crewIds).then(res => {
+        const byId = {};
+        res.data.forEach(s => { byId[s.crew_id] = s; });
+        setCrewRatingSummaries(byId);
+      }).catch(() => setCrewRatingSummaries({}));
+    } else {
+      setCrewRatingSummaries({});
+    }
+  }, [receivedRequests, sentRequests, user?.role, user?.is_admin]);
 
   const loadData = async () => {
     try {
@@ -107,6 +140,57 @@ const StatusPage = () => {
     setSelectedRequest(null);
     setWithdrawReason('');
     setWithdrawDialogOpen(true);
+  };
+
+  const handleOpenRateBoat = (request) => {
+    setRateTarget({ type: 'boat', boat: request.boat, event: request.event, request });
+    setRatingValue(0);
+    setRatingComment('');
+    setRateBoatDialogOpen(true);
+  };
+
+  const handleOpenRateCrew = (item) => {
+    setRateTarget({ type: 'crew', boat: item.boat, event: item.event, crew: item.crew });
+    setRatingValue(0);
+    setRatingComment('');
+    setRateCrewDialogOpen(true);
+  };
+
+  const handleSubmitBoatRating = async () => {
+    if (!rateTarget?.boat?.id || ratingValue < 1) return;
+    try {
+      await boatRatingsAPI.create({
+        boat_id: rateTarget.boat.id,
+        event_id: rateTarget.event?.id || null,
+        rating: ratingValue,
+        comment: ratingComment || null,
+      });
+      setSuccess('Thanks for rating this boat!');
+      setRateBoatDialogOpen(false);
+      setRateTarget(null);
+      loadData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to submit rating');
+    }
+  };
+
+  const handleSubmitCrewRating = async () => {
+    if (!rateTarget?.boat?.id || !rateTarget?.crew?.id || ratingValue < 1) return;
+    try {
+      await crewRatingsAPI.create({
+        crew_id: rateTarget.crew.id,
+        boat_id: rateTarget.boat.id,
+        event_id: rateTarget.event?.id || null,
+        rating: ratingValue,
+        comment: ratingComment || null,
+      });
+      setSuccess('Rating submitted.');
+      setRateCrewDialogOpen(false);
+      setRateTarget(null);
+      loadData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to submit rating');
+    }
   };
 
   const findRequestForCrewEvent = (eventId, boatId) => {
@@ -380,13 +464,28 @@ const StatusPage = () => {
                       
                       {requests.map(request => (
                         <Box key={request.id} sx={{ mb: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                             <DirectionsBoat sx={{ fontSize: 18, color: 'primary.main' }} />
                             <Typography variant="body1" fontWeight={500}>
                               {request.boat?.name}
                             </Typography>
                             {request.boat?.sail_number && (
                               <Chip label={request.boat.sail_number} size="small" variant="outlined" />
+                            )}
+                            {request.boat?.id && boatRatingSummaries[request.boat.id]?.count > 0 && (
+                              <StarRating
+                                value={boatRatingSummaries[request.boat.id].average_rating}
+                                count={boatRatingSummaries[request.boat.id].count}
+                                size="small"
+                                displayOnly
+                              />
+                            )}
+                            {isPastEvent(event.date) && (
+                              <Tooltip title="Rate this boat">
+                                <Button size="small" variant="outlined" onClick={() => handleOpenRateBoat(request)}>
+                                  Rate boat
+                                </Button>
+                              </Tooltip>
                             )}
                             {isUpcoming(event.date) && (
                               <Tooltip title="Withdraw from this event">
@@ -601,10 +700,23 @@ const StatusPage = () => {
                                 variant="outlined"
                                 sx={{ height: 20, fontSize: 11 }}
                               />
+                              {crewRatingSummaries[member.id]?.count > 0 && (
+                                <StarRating
+                                  value={crewRatingSummaries[member.id].average_rating}
+                                  count={crewRatingSummaries[member.id].count}
+                                  size="small"
+                                  displayOnly
+                                />
+                              )}
                               {member.weight && (
                                 <Typography variant="caption" color="text.secondary">
                                   {member.weight} lbs
                                 </Typography>
+                              )}
+                              {isPastEvent(event.date) && (
+                                <Button size="small" variant="outlined" onClick={() => handleOpenRateCrew({ boat, event, crew: member })} sx={{ ml: 'auto' }}>
+                                  Rate
+                                </Button>
                               )}
                               {isUpcoming(event.date) && request && (
                                 <Tooltip title={`Release ${member.name} from this event`}>
@@ -630,6 +742,69 @@ const StatusPage = () => {
           )}
         </>
       )}
+
+      <Dialog open={rateBoatDialogOpen} onClose={() => setRateBoatDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Rate this boat</DialogTitle>
+        <DialogContent>
+          {rateTarget?.boat && (
+            <>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                {rateTarget.boat.name}
+                {rateTarget.event && ` • ${rateTarget.event.name}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Your rating (1–5 stars)</Typography>
+              <StarRating value={ratingValue} displayOnly={false} onChange={setRatingValue} size="medium" />
+              <TextField
+                fullWidth
+                label="Comment (optional)"
+                multiline
+                rows={2}
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                sx={{ mt: 2 }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRateBoatDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmitBoatRating} disabled={ratingValue < 1}>
+            Submit Rating
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={rateCrewDialogOpen} onClose={() => setRateCrewDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Rate crew member</DialogTitle>
+        <DialogContent>
+          {rateTarget?.crew && (
+            <>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                {rateTarget.crew.name}
+                {rateTarget.boat && ` • ${rateTarget.boat.name}`}
+                {rateTarget.event && ` • ${rateTarget.event.name}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Your rating (1–5 stars)</Typography>
+              <StarRating value={ratingValue} displayOnly={false} onChange={setRatingValue} size="medium" />
+              <TextField
+                fullWidth
+                label="Comment (optional)"
+                multiline
+                rows={2}
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                sx={{ mt: 2 }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRateCrewDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmitCrewRating} disabled={ratingValue < 1}>
+            Submit Rating
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={withdrawDialogOpen} onClose={() => setWithdrawDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
