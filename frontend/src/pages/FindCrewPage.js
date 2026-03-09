@@ -269,6 +269,18 @@ const FindCrewPage = () => {
                       Certifications: {availability.crew.certifications}
                     </Typography>
                   )}
+                  {availability.crew?.position_preferences && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        Positions:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {availability.crew.position_preferences.split(',').map((pos, i) => (
+                          <Chip key={i} label={pos.trim()} size="small" variant="outlined" />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
                   {availability.crew?.bio && (
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {availability.crew.bio}

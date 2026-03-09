@@ -15,6 +15,7 @@ import {
   Select,
   MenuItem,
   Grid,
+  Chip,
 } from '@mui/material';
 import { Sailing } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
@@ -33,6 +34,7 @@ const RegisterPage = () => {
     bio: '',
     weight: '',
     certifications: '',
+    position_preferences: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -207,6 +209,40 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     placeholder="e.g., US Sailing Basic Keelboat, ASA 101"
                   />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Position Preferences (optional)
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {['Bow', 'Rail', 'Trimmer', 'Pit', 'Helm', 'Tactician', 'Any'].map((position) => {
+                      const positionsArray = formData.position_preferences 
+                        ? formData.position_preferences.split(',').map(p => p.trim())
+                        : [];
+                      const isSelected = positionsArray.includes(position);
+                      return (
+                        <Chip
+                          key={position}
+                          label={position}
+                          onClick={() => {
+                            let newPositions;
+                            if (isSelected) {
+                              newPositions = positionsArray.filter(p => p !== position);
+                            } else {
+                              newPositions = [...positionsArray, position];
+                            }
+                            setFormData({
+                              ...formData,
+                              position_preferences: newPositions.filter(p => p).join(', ')
+                            });
+                          }}
+                          color={isSelected ? 'primary' : 'default'}
+                          variant={isSelected ? 'filled' : 'outlined'}
+                          sx={{ cursor: 'pointer' }}
+                        />
+                      );
+                    })}
+                  </Box>
                 </Grid>
                 <Grid item xs={12}>
                   <TextField

@@ -55,6 +55,7 @@ class User(Base):
     bio = Column(Text)
     weight = Column(Integer)  # Important for sailboat balance
     certifications = Column(Text)  # Sailing certifications
+    position_preferences = Column(Text)  # Comma-separated: bow, rail, trimmer, pit, helm
     profile_picture = Column(Text)  # Base64 encoded profile picture
     allow_email_contact = Column(Boolean, default=True)
     allow_phone_contact = Column(Boolean, default=False)

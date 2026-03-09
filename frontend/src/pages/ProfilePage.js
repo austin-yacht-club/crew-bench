@@ -42,6 +42,7 @@ const ProfilePage = () => {
     bio: user?.bio || '',
     weight: user?.weight || '',
     certifications: user?.certifications || '',
+    position_preferences: user?.position_preferences || '',
     profile_picture: user?.profile_picture || null,
     allow_email_contact: user?.allow_email_contact ?? true,
     allow_phone_contact: user?.allow_phone_contact ?? false,
@@ -351,6 +352,40 @@ const ProfilePage = () => {
                       value={formData.certifications}
                       onChange={handleChange}
                     />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Position Preferences
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {['Bow', 'Rail', 'Trimmer', 'Pit', 'Helm', 'Tactician', 'Any'].map((position) => {
+                        const positionsArray = formData.position_preferences 
+                          ? formData.position_preferences.split(',').map(p => p.trim())
+                          : [];
+                        const isSelected = positionsArray.includes(position);
+                        return (
+                          <Chip
+                            key={position}
+                            label={position}
+                            onClick={() => {
+                              let newPositions;
+                              if (isSelected) {
+                                newPositions = positionsArray.filter(p => p !== position);
+                              } else {
+                                newPositions = [...positionsArray, position];
+                              }
+                              setFormData({
+                                ...formData,
+                                position_preferences: newPositions.filter(p => p).join(', ')
+                              });
+                            }}
+                            color={isSelected ? 'primary' : 'default'}
+                            variant={isSelected ? 'filled' : 'outlined'}
+                            sx={{ cursor: 'pointer' }}
+                          />
+                        );
+                      })}
+                    </Box>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
