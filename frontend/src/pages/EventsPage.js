@@ -18,6 +18,7 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Checkbox,
   Autocomplete,
   Tabs,
   Tab,
@@ -60,18 +61,31 @@ const EventsPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewTab, setViewTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPastEvents, setShowPastEvents] = useState(false);
 
   const filteredEvents = useMemo(() => {
-    if (!searchQuery.trim()) return events;
-    const query = searchQuery.toLowerCase();
-    return events.filter(event => 
-      event.name?.toLowerCase().includes(query) ||
-      event.series?.toLowerCase().includes(query) ||
-      event.location?.toLowerCase().includes(query) ||
-      event.description?.toLowerCase().includes(query) ||
-      event.event_type?.toLowerCase().includes(query)
-    );
-  }, [events, searchQuery]);
+    let filtered = events;
+    
+    // Filter out past events unless checkbox is checked
+    if (!showPastEvents) {
+      const now = new Date();
+      filtered = filtered.filter(event => new Date(event.date) >= now);
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(event => 
+        event.name?.toLowerCase().includes(query) ||
+        event.series?.toLowerCase().includes(query) ||
+        event.location?.toLowerCase().includes(query) ||
+        event.description?.toLowerCase().includes(query) ||
+        event.event_type?.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [events, searchQuery, showPastEvents]);
 
   useEffect(() => {
     loadData();
@@ -392,7 +406,18 @@ const EventsPage = () => {
                 </InputAdornment>
               ),
             }}
-            sx={{ mb: 2 }}
+            sx={{ mb: 1 }}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={showPastEvents}
+                onChange={(e) => setShowPastEvents(e.target.checked)}
+              />
+            }
+            label="Show past events"
+            sx={{ mb: 1 }}
           />
 
           <Tabs 

@@ -22,6 +22,8 @@ import {
   AccordionSummary,
   AccordionDetails,
   InputAdornment,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { 
   Inbox, 
@@ -144,28 +146,53 @@ const RequestsPage = () => {
   const [responseMessage, setResponseMessage] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPastEvents, setShowPastEvents] = useState(false);
 
   const filteredReceivedRequests = useMemo(() => {
-    if (!searchQuery.trim()) return receivedRequests;
-    const query = searchQuery.toLowerCase();
-    return receivedRequests.filter(r =>
-      r.event?.name?.toLowerCase().includes(query) ||
-      r.event?.series?.toLowerCase().includes(query) ||
-      r.boat?.name?.toLowerCase().includes(query) ||
-      r.boat?.owner?.name?.toLowerCase().includes(query)
-    );
-  }, [receivedRequests, searchQuery]);
+    let filtered = receivedRequests;
+    
+    // Filter out past events unless checkbox is checked
+    if (!showPastEvents) {
+      const now = new Date();
+      filtered = filtered.filter(r => r.event?.date && new Date(r.event.date) >= now);
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r =>
+        r.event?.name?.toLowerCase().includes(query) ||
+        r.event?.series?.toLowerCase().includes(query) ||
+        r.boat?.name?.toLowerCase().includes(query) ||
+        r.boat?.owner?.name?.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [receivedRequests, searchQuery, showPastEvents]);
 
   const filteredSentRequests = useMemo(() => {
-    if (!searchQuery.trim()) return sentRequests;
-    const query = searchQuery.toLowerCase();
-    return sentRequests.filter(r =>
-      r.event?.name?.toLowerCase().includes(query) ||
-      r.event?.series?.toLowerCase().includes(query) ||
-      r.boat?.name?.toLowerCase().includes(query) ||
-      r.crew?.name?.toLowerCase().includes(query)
-    );
-  }, [sentRequests, searchQuery]);
+    let filtered = sentRequests;
+    
+    // Filter out past events unless checkbox is checked
+    if (!showPastEvents) {
+      const now = new Date();
+      filtered = filtered.filter(r => r.event?.date && new Date(r.event.date) >= now);
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r =>
+        r.event?.name?.toLowerCase().includes(query) ||
+        r.event?.series?.toLowerCase().includes(query) ||
+        r.boat?.name?.toLowerCase().includes(query) ||
+        r.crew?.name?.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [sentRequests, searchQuery, showPastEvents]);
 
   useEffect(() => {
     loadRequests();
@@ -397,7 +424,18 @@ const RequestsPage = () => {
             </InputAdornment>
           ),
         }}
-        sx={{ mb: 2 }}
+        sx={{ mb: 1 }}
+      />
+      <FormControlLabel
+        control={
+          <Checkbox
+            size="small"
+            checked={showPastEvents}
+            onChange={(e) => setShowPastEvents(e.target.checked)}
+          />
+        }
+        label="Show past events"
+        sx={{ mb: 1 }}
       />
 
       <Tabs 
