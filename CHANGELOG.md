@@ -33,6 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Duplicate prevention**: Re-importing the same calendar URL won't create duplicate events
 - **Import tracking**: Shows count of skipped duplicates when importing
 
+### Fixed
+
+#### Calendar Import
+- **Series deduplication**: Fixed duplicate series events when calendar page has redundant data
+
 ## [1.0.0] - 2026-03-09
 
 ### Added

@@ -40,11 +40,39 @@ async def import_austin_yacht_club_calendar(url: str = "https://austinyachtclub.
     return events, errors
 
 
+def _deduplicate_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Remove duplicate events based on name + date combination.
+    Keeps the first occurrence of each unique event.
+    """
+    seen = set()
+    unique_events = []
+    
+    for event in events:
+        name = event.get('name', '')
+        date = event.get('date')
+        
+        # Create a unique key based on name and date
+        if date:
+            key = (name.lower().strip(), date.date() if hasattr(date, 'date') else date)
+        else:
+            key = (name.lower().strip(), None)
+        
+        if key not in seen:
+            seen.add(key)
+            unique_events.append(event)
+    
+    return unique_events
+
+
 def _process_series_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Process events to detect series and enumerate them.
     If an event name contains 'Series', extract series name and add enumeration.
     """
+    # First, deduplicate events to remove any duplicates from parsing
+    events = _deduplicate_events(events)
+    
     # Group events by potential series name
     series_groups = {}
     non_series_events = []
