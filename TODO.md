@@ -38,6 +38,7 @@ This document tracks planned features, improvements, and known issues.
 - [x] My Schedule page (view confirmed assignments)
 - [x] Withdrawal from accepted requests
 - [x] Mobile responsive design
+- [x] Search filters for events, schedule, and requests
 
 ---
 
@@ -72,6 +73,9 @@ This document tracks planned features, improvements, and known issues.
 - [ ] Waitlist for when preferred crew declines
 
 #### Search & Discovery
+- [x] Search/filter events by name, series, location
+- [x] Search/filter schedule by event, boat, crew
+- [x] Search/filter requests by event, boat, person
 - [ ] Search/filter events by date range
 - [ ] Filter crew by experience level
 - [ ] Filter by certifications

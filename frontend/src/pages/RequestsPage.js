@@ -21,6 +21,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  InputAdornment,
 } from '@mui/material';
 import { 
   Inbox, 
@@ -34,6 +35,7 @@ import {
   ExpandMore,
   PlaylistAddCheck,
   ExitToApp,
+  Search,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { crewRequestsAPI } from '../services/api';
@@ -141,6 +143,29 @@ const RequestsPage = () => {
   const [selectedSeries, setSelectedSeries] = useState(null);
   const [responseMessage, setResponseMessage] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredReceivedRequests = useMemo(() => {
+    if (!searchQuery.trim()) return receivedRequests;
+    const query = searchQuery.toLowerCase();
+    return receivedRequests.filter(r =>
+      r.event?.name?.toLowerCase().includes(query) ||
+      r.event?.series?.toLowerCase().includes(query) ||
+      r.boat?.name?.toLowerCase().includes(query) ||
+      r.boat?.owner?.name?.toLowerCase().includes(query)
+    );
+  }, [receivedRequests, searchQuery]);
+
+  const filteredSentRequests = useMemo(() => {
+    if (!searchQuery.trim()) return sentRequests;
+    const query = searchQuery.toLowerCase();
+    return sentRequests.filter(r =>
+      r.event?.name?.toLowerCase().includes(query) ||
+      r.event?.series?.toLowerCase().includes(query) ||
+      r.boat?.name?.toLowerCase().includes(query) ||
+      r.crew?.name?.toLowerCase().includes(query)
+    );
+  }, [sentRequests, searchQuery]);
 
   useEffect(() => {
     loadRequests();
@@ -163,7 +188,7 @@ const RequestsPage = () => {
 
   const receivedBySeries = useMemo(() => {
     const grouped = {};
-    receivedRequests.forEach((request) => {
+    filteredReceivedRequests.forEach((request) => {
       const series = request.event?.series;
       if (series) {
         if (!grouped[series]) {
@@ -173,7 +198,7 @@ const RequestsPage = () => {
       }
     });
     return grouped;
-  }, [receivedRequests]);
+  }, [filteredReceivedRequests]);
 
   const getSeriesPendingCount = (seriesName) => {
     return receivedBySeries[seriesName]?.filter(r => r.status === 'pending').length || 0;
@@ -359,6 +384,22 @@ const RequestsPage = () => {
         </Alert>
       )}
 
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="Search by event, series, boat, or person..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search color="action" />
+            </InputAdornment>
+          ),
+        }}
+        sx={{ mb: 2 }}
+      />
+
       <Tabs 
         value={tab} 
         onChange={(_, v) => setTab(v)} 
@@ -367,19 +408,21 @@ const RequestsPage = () => {
         scrollButtons="auto"
         allowScrollButtonsMobile
       >
-        <Tab icon={<Inbox />} label={`Received (${receivedRequests.length})`} iconPosition="start" />
-        <Tab icon={<Send />} label={`Sent (${sentRequests.length})`} iconPosition="start" />
+        <Tab icon={<Inbox />} label={`Received (${filteredReceivedRequests.length})`} iconPosition="start" />
+        <Tab icon={<Send />} label={`Sent (${filteredSentRequests.length})`} iconPosition="start" />
       </Tabs>
 
       {tab === 0 && (
         <>
-          {receivedRequests.length === 0 ? (
+          {filteredReceivedRequests.length === 0 ? (
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 6 }}>
                 <Inbox sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6">No requests received</Typography>
+                <Typography variant="h6">
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No requests received'}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Mark yourself as available for events to receive crew invitations
+                  {searchQuery ? 'Try a different search term' : 'Mark yourself as available for events to receive crew invitations'}
                 </Typography>
               </CardContent>
             </Card>
@@ -453,7 +496,7 @@ const RequestsPage = () => {
                 {Object.keys(receivedBySeries).length > 0 ? 'Individual Invitations' : 'All Invitations'}
               </Typography>
               <Grid container spacing={3}>
-                {receivedRequests
+                {filteredReceivedRequests
                   .filter(r => !r.event?.series)
                   .map((request) => (
                     <Grid item xs={12} md={6} key={request.id}>
@@ -473,19 +516,21 @@ const RequestsPage = () => {
 
       {tab === 1 && (
         <>
-          {sentRequests.length === 0 ? (
+          {filteredSentRequests.length === 0 ? (
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 6 }}>
                 <Send sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6">No requests sent</Typography>
+                <Typography variant="h6">
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No requests sent'}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Find available crew for your events
+                  {searchQuery ? 'Try a different search term' : 'Find available crew for your events'}
                 </Typography>
               </CardContent>
             </Card>
           ) : (
             <Grid container spacing={3}>
-              {sentRequests.map((request) => (
+              {filteredSentRequests.map((request) => (
                 <Grid item xs={12} md={6} key={request.id}>
                   {renderRequestCard(request, false)}
                 </Grid>

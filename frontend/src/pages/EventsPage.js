@@ -24,6 +24,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  InputAdornment,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -34,6 +35,7 @@ import {
   Flag,
   PlaylistAddCheck,
   ExpandMore,
+  Search,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI } from '../services/api';
@@ -57,6 +59,19 @@ const EventsPage = () => {
   const [selectedFleets, setSelectedFleets] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewTab, setViewTab] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) return events;
+    const query = searchQuery.toLowerCase();
+    return events.filter(event => 
+      event.name?.toLowerCase().includes(query) ||
+      event.series?.toLowerCase().includes(query) ||
+      event.location?.toLowerCase().includes(query) ||
+      event.description?.toLowerCase().includes(query) ||
+      event.event_type?.toLowerCase().includes(query)
+    );
+  }, [events, searchQuery]);
 
   useEffect(() => {
     loadData();
@@ -88,7 +103,7 @@ const EventsPage = () => {
 
   const eventsBySeries = useMemo(() => {
     const grouped = {};
-    events.forEach((event) => {
+    filteredEvents.forEach((event) => {
       const key = event.series || 'Other Events';
       if (!grouped[key]) {
         grouped[key] = [];
@@ -96,7 +111,7 @@ const EventsPage = () => {
       grouped[key].push(event);
     });
     return grouped;
-  }, [events]);
+  }, [filteredEvents]);
 
   const isSeriesFullyAvailable = (seriesName) => {
     const seriesEvents = events.filter((e) => e.series === seriesName);
@@ -317,6 +332,22 @@ const EventsPage = () => {
         </Card>
       ) : (
         <>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search events by name, series, location..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 2 }}
+          />
+
           <Tabs 
             value={viewTab} 
             onChange={(_, v) => setViewTab(v)} 
@@ -325,13 +356,25 @@ const EventsPage = () => {
             scrollButtons="auto"
             allowScrollButtonsMobile
           >
-            <Tab label="All Events" />
+            <Tab label={`All Events${searchQuery ? ` (${filteredEvents.length})` : ''}`} />
             <Tab label="By Series" />
           </Tabs>
 
           {viewTab === 0 && (
             <Grid container spacing={3}>
-              {events.map(renderEventCard)}
+              {filteredEvents.length === 0 ? (
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography color="text.secondary">
+                        No events match "{searchQuery}"
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ) : (
+                filteredEvents.map(renderEventCard)
+              )}
             </Grid>
           )}
 

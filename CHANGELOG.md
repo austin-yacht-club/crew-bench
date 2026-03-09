@@ -27,6 +27,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Stacking layouts**: Headers and buttons stack vertically on mobile
 - **Touch-friendly**: Adequate sizing and spacing for touch interaction
 
+#### Search Filters
+- **Events search**: Filter events by name, series, location, or description
+- **Schedule search**: Filter confirmed assignments by event, series, boat, or crew name
+- **Requests search**: Filter incoming/outgoing requests by event, series, boat, or person name
+- **Dynamic counts**: Tab labels update to show filtered result counts
+
 ### Improved
 
 #### Calendar Import

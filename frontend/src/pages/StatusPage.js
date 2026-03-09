@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -21,6 +21,7 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  InputAdornment,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -30,6 +31,7 @@ import {
   Schedule,
   ExitToApp,
   Close,
+  Search,
 } from '@mui/icons-material';
 import { format, isFuture, isPast } from 'date-fns';
 import { crewRequestsAPI, boatsAPI } from '../services/api';
@@ -47,6 +49,7 @@ const StatusPage = () => {
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [withdrawReason, setWithdrawReason] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadData();
@@ -100,6 +103,30 @@ const StatusPage = () => {
     );
   };
 
+  const filteredReceivedRequests = useMemo(() => {
+    const accepted = receivedRequests.filter(r => r.status === 'accepted');
+    if (!searchQuery.trim()) return accepted;
+    const query = searchQuery.toLowerCase();
+    return accepted.filter(r =>
+      r.event?.name?.toLowerCase().includes(query) ||
+      r.event?.series?.toLowerCase().includes(query) ||
+      r.boat?.name?.toLowerCase().includes(query) ||
+      r.boat?.owner?.name?.toLowerCase().includes(query)
+    );
+  }, [receivedRequests, searchQuery]);
+
+  const filteredSentRequests = useMemo(() => {
+    const accepted = sentRequests.filter(r => r.status === 'accepted');
+    if (!searchQuery.trim()) return accepted;
+    const query = searchQuery.toLowerCase();
+    return accepted.filter(r =>
+      r.event?.name?.toLowerCase().includes(query) ||
+      r.event?.series?.toLowerCase().includes(query) ||
+      r.boat?.name?.toLowerCase().includes(query) ||
+      r.crew?.name?.toLowerCase().includes(query)
+    );
+  }, [sentRequests, searchQuery]);
+
   const acceptedReceivedRequests = receivedRequests.filter(r => r.status === 'accepted');
   const acceptedSentRequests = sentRequests.filter(r => r.status === 'accepted');
 
@@ -146,8 +173,8 @@ const StatusPage = () => {
     );
   };
 
-  const crewSchedule = groupByEvent(acceptedReceivedRequests);
-  const skipperSchedule = groupByBoatAndEvent(acceptedSentRequests);
+  const crewSchedule = groupByEvent(filteredReceivedRequests);
+  const skipperSchedule = groupByBoatAndEvent(filteredSentRequests);
 
   const isUpcoming = (date) => isFuture(new Date(date));
   const isPastEvent = (date) => isPast(new Date(date));
@@ -223,6 +250,22 @@ const StatusPage = () => {
         </Grid>
       </Grid>
 
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="Search by event, series, boat, or crew..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search color="action" />
+            </InputAdornment>
+          ),
+        }}
+        sx={{ mb: 2 }}
+      />
+
       <Tabs 
         value={tab} 
         onChange={(_, v) => setTab(v)} 
@@ -250,9 +293,11 @@ const StatusPage = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 6 }}>
                 <DirectionsBoat sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6">No confirmed crew positions</Typography>
+                <Typography variant="h6">
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No confirmed crew positions'}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Mark yourself as available for events and accept crew requests
+                  {searchQuery ? 'Try a different search term' : 'Mark yourself as available for events and accept crew requests'}
                 </Typography>
               </CardContent>
             </Card>
@@ -330,9 +375,11 @@ const StatusPage = () => {
             <Card>
               <CardContent sx={{ textAlign: 'center', py: 6 }}>
                 <People sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6">No confirmed crew for your boats</Typography>
+                <Typography variant="h6">
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No confirmed crew for your boats'}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Browse available crew and send requests for your events
+                  {searchQuery ? 'Try a different search term' : 'Browse available crew and send requests for your events'}
                 </Typography>
               </CardContent>
             </Card>
