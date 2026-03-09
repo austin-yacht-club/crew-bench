@@ -149,10 +149,10 @@ const AdminPage = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
         Admin Dashboard
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
         Manage events, users, and import racing calendars
       </Typography>
 
@@ -167,10 +167,17 @@ const AdminPage = () => {
         </Alert>
       )}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-        <Tab icon={<Event />} label="Events" />
-        <Tab icon={<CloudDownload />} label="Import Calendar" />
-        <Tab icon={<People />} label="Users" />
+      <Tabs 
+        value={tab} 
+        onChange={(_, v) => setTab(v)} 
+        sx={{ mb: 3 }}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+      >
+        <Tab icon={<Event />} label="Events" iconPosition="start" />
+        <Tab icon={<CloudDownload />} label="Import" iconPosition="start" />
+        <Tab icon={<People />} label="Users" iconPosition="start" />
       </Tabs>
 
       {tab === 0 && (

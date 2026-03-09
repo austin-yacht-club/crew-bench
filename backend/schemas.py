@@ -113,6 +113,8 @@ class EventBase(BaseModel):
     location: Optional[str] = None
     event_type: Optional[str] = None
     series: Optional[str] = None
+    series_index: Optional[int] = None
+    series_total: Optional[int] = None
     external_url: Optional[str] = None
 
 
@@ -128,6 +130,8 @@ class EventUpdate(BaseModel):
     location: Optional[str] = None
     event_type: Optional[str] = None
     series: Optional[str] = None
+    series_index: Optional[int] = None
+    series_total: Optional[int] = None
     external_url: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -151,6 +155,14 @@ class CrewAvailabilityBase(BaseModel):
 class CrewAvailabilityCreate(CrewAvailabilityBase):
     boat_ids: Optional[List[int]] = None
     fleet_ids: Optional[List[int]] = None
+
+
+class SeriesAvailabilityCreate(BaseModel):
+    series: str
+    availability_type: Optional[str] = "any"
+    boat_ids: Optional[List[int]] = None
+    fleet_ids: Optional[List[int]] = None
+    notes: Optional[str] = None
 
 
 class CrewAvailability(CrewAvailabilityBase):
@@ -178,9 +190,26 @@ class CrewRequestCreate(CrewRequestBase):
     pass
 
 
+class SeriesCrewRequestCreate(BaseModel):
+    boat_id: int
+    crew_id: int
+    series: str
+    message: Optional[str] = None
+
+
 class CrewRequestResponse(BaseModel):
     status: str
     response_message: Optional[str] = None
+
+
+class SeriesCrewRequestResponse(BaseModel):
+    status: str
+    series: str
+    response_message: Optional[str] = None
+
+
+class WithdrawRequest(BaseModel):
+    reason: Optional[str] = None
 
 
 class CrewRequest(CrewRequestBase):
@@ -208,5 +237,6 @@ class TokenData(BaseModel):
 
 class ImportResult(BaseModel):
     imported_count: int
+    skipped_count: int = 0
     events: List[Event]
     errors: List[str] = []

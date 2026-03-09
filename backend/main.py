@@ -385,6 +385,91 @@ def remove_availability(
     return {"message": "Availability removed"}
 
 
+# Series Availability Routes
+@app.post("/api/availability/series", response_model=List[schemas.CrewAvailability])
+def mark_series_availability(
+    availability: schemas.SeriesAvailabilityCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Mark availability for all events in a series at once."""
+    # Find all active events in this series
+    series_events = db.query(Event).filter(
+        Event.series == availability.series,
+        Event.is_active == True
+    ).order_by(Event.date).all()
+    
+    if not series_events:
+        raise HTTPException(status_code=404, detail=f"No events found for series: {availability.series}")
+    
+    created_availabilities = []
+    
+    # Get preferred boats and fleets if specified
+    preferred_boats = []
+    preferred_fleets = []
+    if availability.boat_ids and availability.availability_type == "boats":
+        preferred_boats = db.query(Boat).filter(Boat.id.in_(availability.boat_ids)).all()
+    if availability.fleet_ids and availability.availability_type == "fleets":
+        preferred_fleets = db.query(Fleet).filter(Fleet.id.in_(availability.fleet_ids)).all()
+    
+    for event in series_events:
+        # Check if already marked for this event
+        existing = db.query(CrewAvailability).filter(
+            CrewAvailability.crew_id == current_user.id,
+            CrewAvailability.event_id == event.id
+        ).first()
+        
+        if existing:
+            continue
+        
+        db_availability = CrewAvailability(
+            crew_id=current_user.id,
+            event_id=event.id,
+            availability_type=availability.availability_type or "any",
+            notes=availability.notes
+        )
+        db_availability.preferred_boats = preferred_boats
+        db_availability.preferred_fleets = preferred_fleets
+        
+        db.add(db_availability)
+        db.commit()
+        db.refresh(db_availability)
+        created_availabilities.append(db_availability)
+    
+    return created_availabilities
+
+
+@app.get("/api/series", response_model=List[str])
+def list_series(
+    upcoming_only: bool = False,
+    db: Session = Depends(get_db)
+):
+    """List all unique series names."""
+    query = db.query(Event.series).filter(
+        Event.series.isnot(None),
+        Event.is_active == True
+    ).distinct()
+    
+    if upcoming_only:
+        query = query.filter(Event.date >= datetime.utcnow())
+    
+    series_names = [s[0] for s in query.all() if s[0]]
+    return sorted(series_names)
+
+
+@app.get("/api/series/{series_name}/events", response_model=List[schemas.Event])
+def get_series_events(
+    series_name: str,
+    db: Session = Depends(get_db)
+):
+    """Get all events in a series."""
+    events = db.query(Event).filter(
+        Event.series == series_name,
+        Event.is_active == True
+    ).order_by(Event.date).all()
+    return events
+
+
 # Crew Request Routes
 @app.post("/api/crew-requests", response_model=schemas.CrewRequest)
 def create_crew_request(
@@ -478,6 +563,150 @@ def respond_to_request(
     return crew_request
 
 
+# Withdrawal Routes
+@app.put("/api/crew-requests/{request_id}/withdraw", response_model=schemas.CrewRequest)
+def withdraw_from_request(
+    request_id: int,
+    withdraw_data: schemas.WithdrawRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Withdraw from an accepted crew request.
+    Can be called by either the crew member or the boat owner (skipper).
+    When withdrawn, the crew member is marked as available again for that event.
+    """
+    crew_request = db.query(CrewRequest).options(
+        joinedload(CrewRequest.boat)
+    ).filter(CrewRequest.id == request_id).first()
+    
+    if not crew_request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    if crew_request.status != RequestStatus.ACCEPTED.value:
+        raise HTTPException(status_code=400, detail="Can only withdraw from accepted requests")
+    
+    # Check authorization - either the crew member or the boat owner can withdraw
+    is_crew = crew_request.crew_id == current_user.id
+    is_skipper = crew_request.boat and crew_request.boat.owner_id == current_user.id
+    
+    if not is_crew and not is_skipper and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to withdraw from this request")
+    
+    # Update the request status
+    crew_request.status = RequestStatus.WITHDRAWN.value
+    
+    # Record who withdrew and why
+    withdrawer = "Crew" if is_crew else "Skipper"
+    reason = withdraw_data.reason or "No reason provided"
+    crew_request.response_message = f"Withdrawn by {withdrawer}: {reason}"
+    crew_request.responded_at = datetime.utcnow()
+    
+    # Mark crew as available again for this event
+    availability = db.query(CrewAvailability).filter(
+        CrewAvailability.crew_id == crew_request.crew_id,
+        CrewAvailability.event_id == crew_request.event_id
+    ).first()
+    
+    if availability:
+        availability.is_matched = False
+    
+    db.commit()
+    db.refresh(crew_request)
+    return crew_request
+
+
+# Series Crew Request Routes
+@app.post("/api/crew-requests/series", response_model=List[schemas.CrewRequest])
+def create_series_crew_request(
+    request: schemas.SeriesCrewRequestCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Create crew requests for all events in a series at once."""
+    boat = db.query(Boat).filter(Boat.id == request.boat_id).first()
+    if not boat:
+        raise HTTPException(status_code=404, detail="Boat not found")
+    if boat.owner_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="You can only request crew for your own boat")
+    
+    # Find all events in the series
+    series_events = db.query(Event).filter(
+        Event.series == request.series,
+        Event.is_active == True,
+        Event.date >= datetime.utcnow()
+    ).order_by(Event.date).all()
+    
+    if not series_events:
+        raise HTTPException(status_code=404, detail=f"No upcoming events found for series: {request.series}")
+    
+    created_requests = []
+    
+    for event in series_events:
+        # Check if request already exists for this event
+        existing = db.query(CrewRequest).filter(
+            CrewRequest.boat_id == request.boat_id,
+            CrewRequest.crew_id == request.crew_id,
+            CrewRequest.event_id == event.id,
+            CrewRequest.status == RequestStatus.PENDING.value
+        ).first()
+        
+        if existing:
+            continue
+        
+        db_request = CrewRequest(
+            boat_id=request.boat_id,
+            crew_id=request.crew_id,
+            event_id=event.id,
+            message=request.message
+        )
+        db.add(db_request)
+        db.commit()
+        db.refresh(db_request)
+        created_requests.append(db_request)
+    
+    return created_requests
+
+
+@app.put("/api/crew-requests/series/respond", response_model=List[schemas.CrewRequest])
+def respond_to_series_requests(
+    response: schemas.SeriesCrewRequestResponse,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Respond to all pending crew requests for a series from the same boat."""
+    # Find all pending requests for this crew in the specified series
+    pending_requests = db.query(CrewRequest).join(Event).filter(
+        CrewRequest.crew_id == current_user.id,
+        CrewRequest.status == RequestStatus.PENDING.value,
+        Event.series == response.series
+    ).all()
+    
+    if not pending_requests:
+        raise HTTPException(status_code=404, detail=f"No pending requests found for series: {response.series}")
+    
+    updated_requests = []
+    
+    for crew_request in pending_requests:
+        crew_request.status = response.status
+        crew_request.response_message = response.response_message
+        crew_request.responded_at = datetime.utcnow()
+        
+        if response.status == RequestStatus.ACCEPTED.value:
+            availability = db.query(CrewAvailability).filter(
+                CrewAvailability.crew_id == current_user.id,
+                CrewAvailability.event_id == crew_request.event_id
+            ).first()
+            if availability:
+                availability.is_matched = True
+        
+        db.commit()
+        db.refresh(crew_request)
+        updated_requests.append(crew_request)
+    
+    return updated_requests
+
+
 # Admin Routes
 @app.get("/api/admin/users", response_model=List[schemas.User])
 def list_all_users(
@@ -499,29 +728,50 @@ async def import_calendar(
     events_data, errors = await import_austin_yacht_club_calendar(url)
     
     imported_events = []
+    skipped_count = 0
+    
     for event_data in events_data:
-        existing = db.query(Event).filter(
-            Event.name == event_data['name'],
-            Event.date == event_data['date']
-        ).first()
+        # Check for duplicates using multiple criteria
+        # Primary check: same imported_from URL + same date + same series + same series_index
+        # Secondary check: same name + same date (for manually created events)
+        existing = None
+        
+        if event_data.get('series') and event_data.get('series_index'):
+            existing = db.query(Event).filter(
+                Event.imported_from == event_data.get('imported_from'),
+                Event.series == event_data.get('series'),
+                Event.series_index == event_data.get('series_index')
+            ).first()
         
         if not existing:
-            db_event = Event(
-                name=event_data['name'],
-                date=event_data['date'],
-                event_type=event_data.get('event_type', 'race'),
-                series=event_data.get('series'),
-                external_url=event_data.get('external_url'),
-                imported_from=event_data.get('imported_from'),
-                created_by_id=current_user.id
-            )
-            db.add(db_event)
-            db.commit()
-            db.refresh(db_event)
-            imported_events.append(db_event)
+            existing = db.query(Event).filter(
+                Event.name == event_data['name'],
+                Event.date == event_data['date']
+            ).first()
+        
+        if existing:
+            skipped_count += 1
+            continue
+        
+        db_event = Event(
+            name=event_data['name'],
+            date=event_data['date'],
+            event_type=event_data.get('event_type', 'race'),
+            series=event_data.get('series'),
+            series_index=event_data.get('series_index'),
+            series_total=event_data.get('series_total'),
+            external_url=event_data.get('external_url'),
+            imported_from=event_data.get('imported_from'),
+            created_by_id=current_user.id
+        )
+        db.add(db_event)
+        db.commit()
+        db.refresh(db_event)
+        imported_events.append(db_event)
     
     return schemas.ImportResult(
         imported_count=len(imported_events),
+        skipped_count=skipped_count,
         events=imported_events,
         errors=errors
     )

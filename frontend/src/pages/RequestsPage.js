@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -18,6 +18,9 @@ import {
   TextField,
   CircularProgress,
   Divider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import { 
   Inbox, 
@@ -28,6 +31,9 @@ import {
   Email,
   Phone,
   Sms,
+  ExpandMore,
+  PlaylistAddCheck,
+  ExitToApp,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { crewRequestsAPI } from '../services/api';
@@ -128,9 +134,13 @@ const RequestsPage = () => {
   const [sentRequests, setSentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedSeries, setSelectedSeries] = useState(null);
   const [responseMessage, setResponseMessage] = useState('');
+  const [withdrawReason, setWithdrawReason] = useState('');
 
   useEffect(() => {
     loadRequests();
@@ -151,14 +161,72 @@ const RequestsPage = () => {
     }
   };
 
+  const receivedBySeries = useMemo(() => {
+    const grouped = {};
+    receivedRequests.forEach((request) => {
+      const series = request.event?.series;
+      if (series) {
+        if (!grouped[series]) {
+          grouped[series] = [];
+        }
+        grouped[series].push(request);
+      }
+    });
+    return grouped;
+  }, [receivedRequests]);
+
+  const getSeriesPendingCount = (seriesName) => {
+    return receivedBySeries[seriesName]?.filter(r => r.status === 'pending').length || 0;
+  };
+
   const handleRespond = async (status) => {
     try {
-      await crewRequestsAPI.respond(selectedRequest.id, status, responseMessage);
+      if (selectedSeries) {
+        const result = await crewRequestsAPI.respondToSeries(selectedSeries, status, responseMessage);
+        setSuccess(`${status === 'accepted' ? 'Accepted' : 'Declined'} ${result.data.length} requests for ${selectedSeries}`);
+      } else {
+        await crewRequestsAPI.respond(selectedRequest.id, status, responseMessage);
+      }
       setDialogOpen(false);
       setResponseMessage('');
+      setSelectedSeries(null);
+      setSelectedRequest(null);
       loadRequests();
     } catch (err) {
       setError('Failed to respond to request');
+    }
+  };
+
+  const handleOpenSeriesDialog = (seriesName) => {
+    setSelectedSeries(seriesName);
+    setSelectedRequest(null);
+    setResponseMessage('');
+    setDialogOpen(true);
+  };
+
+  const handleOpenRequestDialog = (request) => {
+    setSelectedRequest(request);
+    setSelectedSeries(null);
+    setResponseMessage('');
+    setDialogOpen(true);
+  };
+
+  const handleOpenWithdrawDialog = (request) => {
+    setSelectedRequest(request);
+    setWithdrawReason('');
+    setWithdrawDialogOpen(true);
+  };
+
+  const handleWithdraw = async () => {
+    try {
+      await crewRequestsAPI.withdraw(selectedRequest.id, withdrawReason);
+      setSuccess('Successfully withdrawn from the event');
+      setWithdrawDialogOpen(false);
+      setWithdrawReason('');
+      setSelectedRequest(null);
+      loadRequests();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to withdraw');
     }
   };
 
@@ -167,10 +235,100 @@ const RequestsPage = () => {
       pending: { color: 'warning', icon: <Schedule />, label: 'Pending' },
       accepted: { color: 'success', icon: <CheckCircle />, label: 'Accepted' },
       declined: { color: 'error', icon: <Cancel />, label: 'Declined' },
+      withdrawn: { color: 'default', icon: <ExitToApp />, label: 'Withdrawn' },
     };
     const c = config[status] || config.pending;
     return <Chip icon={c.icon} label={c.label} color={c.color} size="small" />;
   };
+
+  const renderRequestCard = (request, isReceived) => (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          {isReceived ? (
+            <Typography variant="h6">{request.boat?.name}</Typography>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Avatar 
+                src={request.crew?.profile_picture || undefined}
+                sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}
+              >
+                {!request.crew?.profile_picture && request.crew?.name?.charAt(0).toUpperCase()}
+              </Avatar>
+              <Typography variant="h6">{request.crew?.name}</Typography>
+            </Box>
+          )}
+          {statusChip(request.status)}
+        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Event: {request.event?.name}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Date: {request.event?.date && format(new Date(request.event.date), 'MMM d, yyyy')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Boat: {isReceived 
+            ? [request.boat?.make, request.boat?.model].filter(Boolean).join(' ') 
+            : request.boat?.name}
+        </Typography>
+        {isReceived && request.boat?.owner && (
+          <Typography variant="body2" color="text.secondary">
+            Skipper: {request.boat.owner.name}
+          </Typography>
+        )}
+        {request.message && (
+          <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+            {isReceived ? `"${request.message}"` : `Your message: "${request.message}"`}
+          </Typography>
+        )}
+        {isReceived && request.status === 'pending' && (
+          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              onClick={() => handleOpenRequestDialog(request)}
+            >
+              Accept
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={() => handleOpenRequestDialog(request)}
+            >
+              Decline
+            </Button>
+          </Box>
+        )}
+        {request.response_message && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {isReceived ? 'Your response' : 'Their response'}: "{request.response_message}"
+          </Typography>
+        )}
+        
+        {request.status === 'accepted' && (
+          <>
+            {isReceived 
+              ? request.boat?.owner && <ContactInfo user={request.boat.owner} label="Skipper" />
+              : request.crew && <ContactInfo user={request.crew} label="Crew" />
+            }
+            <Box sx={{ mt: 2 }}>
+              <Button
+                size="small"
+                color="warning"
+                variant="outlined"
+                startIcon={<ExitToApp />}
+                onClick={() => handleOpenWithdrawDialog(request)}
+              >
+                Withdraw
+              </Button>
+            </Box>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   if (loading) {
     return (
@@ -182,10 +340,10 @@ const RequestsPage = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
         Crew Requests
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
         Manage your crew invitations
       </Typography>
 
@@ -195,9 +353,22 @@ const RequestsPage = () => {
         </Alert>
       )}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-        <Tab icon={<Inbox />} label={`Received (${receivedRequests.length})`} />
-        <Tab icon={<Send />} label={`Sent (${sentRequests.length})`} />
+      {success && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+
+      <Tabs 
+        value={tab} 
+        onChange={(_, v) => setTab(v)} 
+        sx={{ mb: 3 }}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+      >
+        <Tab icon={<Inbox />} label={`Received (${receivedRequests.length})`} iconPosition="start" />
+        <Tab icon={<Send />} label={`Sent (${sentRequests.length})`} iconPosition="start" />
       </Tabs>
 
       {tab === 0 && (
@@ -213,72 +384,89 @@ const RequestsPage = () => {
               </CardContent>
             </Card>
           ) : (
-            <Grid container spacing={3}>
-              {receivedRequests.map((request) => (
-                <Grid item xs={12} md={6} key={request.id}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="h6">{request.boat?.name}</Typography>
-                        {statusChip(request.status)}
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Event: {request.event?.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Date: {request.event?.date && format(new Date(request.event.date), 'MMM d, yyyy')}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Boat: {[request.boat?.make, request.boat?.model].filter(Boolean).join(' ')}
-                      </Typography>
-                      {request.boat?.owner && (
-                        <Typography variant="body2" color="text.secondary">
-                          Skipper: {request.boat.owner.name}
-                        </Typography>
-                      )}
-                      {request.message && (
-                        <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                          "{request.message}"
-                        </Typography>
-                      )}
-                      {request.status === 'pending' && (
-                        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            onClick={() => {
-                              setSelectedRequest(request);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            Accept
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={() => {
-                              setSelectedRequest(request);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            Decline
-                          </Button>
-                        </Box>
-                      )}
-                      {request.response_message && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Your response: "{request.response_message}"
-                        </Typography>
-                      )}
-                      
-                      {request.status === 'accepted' && request.boat?.owner && (
-                        <ContactInfo user={request.boat.owner} label="Skipper" />
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
+            <>
+              {Object.keys(receivedBySeries).length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Series Invitations</Typography>
+                  {Object.entries(receivedBySeries).map(([seriesName, seriesRequests]) => {
+                    const pendingCount = getSeriesPendingCount(seriesName);
+                    return (
+                      <Accordion key={seriesName} sx={{ mb: 1 }}>
+                        <AccordionSummary expandIcon={<ExpandMore />}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            flexDirection: { xs: 'column', sm: 'row' },
+                            alignItems: { xs: 'flex-start', sm: 'center' }, 
+                            gap: { xs: 1, sm: 2 }, 
+                            width: '100%' 
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>{seriesName}</Typography>
+                              <Chip 
+                                label={`${seriesRequests.length} events`} 
+                                size="small" 
+                                variant="outlined" 
+                              />
+                              {pendingCount > 0 && (
+                                <Chip 
+                                  label={`${pendingCount} pending`} 
+                                  size="small" 
+                                  color="warning" 
+                                />
+                              )}
+                            </Box>
+                            {pendingCount > 0 && (
+                              <Box sx={{ ml: { sm: 'auto' }, mr: { sm: 2 } }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="success"
+                                  startIcon={<PlaylistAddCheck />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSeriesDialog(seriesName);
+                                  }}
+                                  sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
+                                >
+                                  Respond to All
+                                </Button>
+                              </Box>
+                            )}
+                          </Box>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <Grid container spacing={2}>
+                            {seriesRequests.map((request) => (
+                              <Grid item xs={12} md={6} key={request.id}>
+                                {renderRequestCard(request, true)}
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
+                </Box>
+              )}
+
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                {Object.keys(receivedBySeries).length > 0 ? 'Individual Invitations' : 'All Invitations'}
+              </Typography>
+              <Grid container spacing={3}>
+                {receivedRequests
+                  .filter(r => !r.event?.series)
+                  .map((request) => (
+                    <Grid item xs={12} md={6} key={request.id}>
+                      {renderRequestCard(request, true)}
+                    </Grid>
+                  ))}
+                {Object.keys(receivedBySeries).length === 0 && receivedRequests.map((request) => (
+                  <Grid item xs={12} md={6} key={request.id}>
+                    {renderRequestCard(request, true)}
+                  </Grid>
+                ))}
+              </Grid>
+            </>
           )}
         </>
       )}
@@ -299,45 +487,7 @@ const RequestsPage = () => {
             <Grid container spacing={3}>
               {sentRequests.map((request) => (
                 <Grid item xs={12} md={6} key={request.id}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar 
-                            src={request.crew?.profile_picture || undefined}
-                            sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}
-                          >
-                            {!request.crew?.profile_picture && request.crew?.name?.charAt(0).toUpperCase()}
-                          </Avatar>
-                          <Typography variant="h6">{request.crew?.name}</Typography>
-                        </Box>
-                        {statusChip(request.status)}
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        Event: {request.event?.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Date: {request.event?.date && format(new Date(request.event.date), 'MMM d, yyyy')}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Boat: {request.boat?.name}
-                      </Typography>
-                      {request.message && (
-                        <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                          Your message: "{request.message}"
-                        </Typography>
-                      )}
-                      {request.response_message && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Their response: "{request.response_message}"
-                        </Typography>
-                      )}
-                      
-                      {request.status === 'accepted' && request.crew && (
-                        <ContactInfo user={request.crew} label="Crew" />
-                      )}
-                    </CardContent>
-                  </Card>
+                  {renderRequestCard(request, false)}
                 </Grid>
               ))}
             </Grid>
@@ -346,11 +496,23 @@ const RequestsPage = () => {
       )}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Respond to Request</DialogTitle>
+        <DialogTitle>
+          {selectedSeries 
+            ? `Respond to ${selectedSeries} Invitations`
+            : 'Respond to Request'}
+        </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Respond to the crew invitation from {selectedRequest?.boat?.name}
+            {selectedSeries 
+              ? `Respond to all ${getSeriesPendingCount(selectedSeries)} pending invitations for ${selectedSeries}`
+              : `Respond to the crew invitation from ${selectedRequest?.boat?.name}`}
           </Typography>
+          {selectedSeries && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              This will {' '}
+              <strong>accept</strong> or <strong>decline</strong> all pending requests for this series at once.
+            </Alert>
+          )}
           <TextField
             fullWidth
             label="Message (optional)"
@@ -368,14 +530,47 @@ const RequestsPage = () => {
             color="error"
             onClick={() => handleRespond('declined')}
           >
-            Decline
+            {selectedSeries ? 'Decline All' : 'Decline'}
           </Button>
           <Button
             variant="contained"
             color="success"
             onClick={() => handleRespond('accepted')}
           >
-            Accept
+            {selectedSeries ? 'Accept All' : 'Accept'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={withdrawDialogOpen} onClose={() => setWithdrawDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Withdraw from Event</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Are you sure you want to withdraw from this event? This will cancel your confirmed crew position.
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <strong>Event:</strong> {selectedRequest?.event?.name}<br />
+            <strong>Date:</strong> {selectedRequest?.event?.date && format(new Date(selectedRequest.event.date), 'MMMM d, yyyy')}<br />
+            <strong>Boat:</strong> {selectedRequest?.boat?.name}
+          </Typography>
+          <TextField
+            fullWidth
+            label="Reason for withdrawal (optional)"
+            multiline
+            rows={3}
+            value={withdrawReason}
+            onChange={(e) => setWithdrawReason(e.target.value)}
+            placeholder="Let them know why you're withdrawing..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleWithdraw}
+          >
+            Confirm Withdrawal
           </Button>
         </DialogActions>
       </Dialog>

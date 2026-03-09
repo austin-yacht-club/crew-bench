@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -19,14 +19,19 @@ import {
   Chip,
   Avatar,
   CircularProgress,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { People, Send } from '@mui/icons-material';
-import { eventsAPI, boatsAPI, crewRequestsAPI } from '../services/api';
+import { People, Send, Event as EventIcon, PlaylistAdd } from '@mui/icons-material';
+import { eventsAPI, boatsAPI, crewRequestsAPI, seriesAPI } from '../services/api';
 
 const FindCrewPage = () => {
   const [events, setEvents] = useState([]);
   const [boats, setBoats] = useState([]);
+  const [seriesList, setSeriesList] = useState([]);
+  const [selectionMode, setSelectionMode] = useState('event');
   const [selectedEvent, setSelectedEvent] = useState('');
+  const [selectedSeries, setSelectedSeries] = useState('');
   const [selectedBoat, setSelectedBoat] = useState('');
   const [availableCrew, setAvailableCrew] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +40,7 @@ const FindCrewPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCrew, setSelectedCrew] = useState(null);
   const [message, setMessage] = useState('');
+  const [requestForSeries, setRequestForSeries] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -46,14 +52,21 @@ const FindCrewPage = () => {
     }
   }, [selectedEvent]);
 
+  const seriesEvents = useMemo(() => {
+    if (!selectedSeries) return [];
+    return events.filter(e => e.series === selectedSeries);
+  }, [events, selectedSeries]);
+
   const loadInitialData = async () => {
     try {
-      const [eventsRes, boatsRes] = await Promise.all([
+      const [eventsRes, boatsRes, seriesRes] = await Promise.all([
         eventsAPI.list(true),
         boatsAPI.listMy(),
+        seriesAPI.list(true),
       ]);
       setEvents(eventsRes.data);
       setBoats(boatsRes.data);
+      setSeriesList(seriesRes.data);
     } catch (err) {
       setError('Failed to load data');
     } finally {
@@ -70,6 +83,12 @@ const FindCrewPage = () => {
     }
   };
 
+  const getSelectedEventSeries = () => {
+    if (!selectedEvent) return null;
+    const event = events.find(e => e.id === parseInt(selectedEvent));
+    return event?.series || null;
+  };
+
   const handleSendRequest = async () => {
     if (!selectedBoat) {
       setError('Please select a boat first');
@@ -77,15 +96,29 @@ const FindCrewPage = () => {
     }
 
     try {
-      await crewRequestsAPI.create({
-        boat_id: parseInt(selectedBoat),
-        crew_id: selectedCrew.crew.id,
-        event_id: parseInt(selectedEvent),
-        message,
-      });
-      setSuccess(`Request sent to ${selectedCrew.crew.name}`);
+      const eventSeries = getSelectedEventSeries();
+      
+      if (requestForSeries && eventSeries) {
+        const result = await crewRequestsAPI.createForSeries({
+          boat_id: parseInt(selectedBoat),
+          crew_id: selectedCrew.crew.id,
+          series: eventSeries,
+          message,
+        });
+        setSuccess(`Sent ${result.data.length} requests to ${selectedCrew.crew.name} for ${eventSeries}`);
+      } else {
+        await crewRequestsAPI.create({
+          boat_id: parseInt(selectedBoat),
+          crew_id: selectedCrew.crew.id,
+          event_id: parseInt(selectedEvent),
+          message,
+        });
+        setSuccess(`Request sent to ${selectedCrew.crew.name}`);
+      }
+      
       setDialogOpen(false);
       setMessage('');
+      setRequestForSeries(false);
       loadAvailableCrew();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to send request');
@@ -112,10 +145,10 @@ const FindCrewPage = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
         Find Crew
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
         Browse available crew for your upcoming events
       </Typography>
 
@@ -138,23 +171,7 @@ const FindCrewPage = () => {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Select Event</InputLabel>
-                  <Select
-                    value={selectedEvent}
-                    onChange={(e) => setSelectedEvent(e.target.value)}
-                    label="Select Event"
-                  >
-                    {events.map((event) => (
-                      <MenuItem key={event.id} value={event.id}>
-                        {event.name} - {new Date(event.date).toLocaleDateString()}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Select Boat</InputLabel>
                   <Select
@@ -170,6 +187,31 @@ const FindCrewPage = () => {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Select Event</InputLabel>
+                  <Select
+                    value={selectedEvent}
+                    onChange={(e) => setSelectedEvent(e.target.value)}
+                    label="Select Event"
+                  >
+                    {events.map((event) => (
+                      <MenuItem key={event.id} value={event.id}>
+                        {event.name} - {new Date(event.date).toLocaleDateString()}
+                        {event.series && ` (${event.series})`}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              {getSelectedEventSeries() && (
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={<PlaylistAdd />}>
+                    This event is part of <strong>{getSelectedEventSeries()}</strong>. 
+                    When inviting crew, you can choose to invite them for all events in the series.
+                  </Alert>
+                </Grid>
+              )}
             </Grid>
           </CardContent>
         </Card>
@@ -252,6 +294,36 @@ const FindCrewPage = () => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Invite {selectedCrew?.crew?.name} to crew on your boat
           </Typography>
+          
+          {getSelectedEventSeries() && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Request scope:
+              </Typography>
+              <ToggleButtonGroup
+                value={requestForSeries}
+                exclusive
+                onChange={(_, value) => value !== null && setRequestForSeries(value)}
+                fullWidth
+                size="small"
+              >
+                <ToggleButton value={false}>
+                  <EventIcon sx={{ mr: 1 }} />
+                  This Event Only
+                </ToggleButton>
+                <ToggleButton value={true}>
+                  <PlaylistAdd sx={{ mr: 1 }} />
+                  Entire Series ({events.filter(e => e.series === getSelectedEventSeries()).length} events)
+                </ToggleButton>
+              </ToggleButtonGroup>
+              {requestForSeries && (
+                <Alert severity="info" sx={{ mt: 1 }} icon={false}>
+                  This will send invitations for all upcoming events in <strong>{getSelectedEventSeries()}</strong>.
+                </Alert>
+              )}
+            </Box>
+          )}
+          
           <TextField
             fullWidth
             label="Message (optional)"
@@ -265,7 +337,7 @@ const FindCrewPage = () => {
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSendRequest}>
-            Send Request
+            {requestForSeries ? 'Send Series Request' : 'Send Request'}
           </Button>
         </DialogActions>
       </Dialog>

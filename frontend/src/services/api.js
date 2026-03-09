@@ -66,17 +66,26 @@ export const eventsAPI = {
   getAvailableCrew: (id) => api.get(`/events/${id}/available-crew`),
 };
 
+export const seriesAPI = {
+  list: (upcomingOnly = true) => api.get('/series', { params: { upcoming_only: upcomingOnly } }),
+  getEvents: (seriesName) => api.get(`/series/${encodeURIComponent(seriesName)}/events`),
+};
+
 export const availabilityAPI = {
   markAvailable: (data) => api.post('/availability', data),
+  markSeriesAvailable: (data) => api.post('/availability/series', data),
   getMy: () => api.get('/availability/my'),
   remove: (id) => api.delete(`/availability/${id}`),
 };
 
 export const crewRequestsAPI = {
   create: (data) => api.post('/crew-requests', data),
+  createForSeries: (data) => api.post('/crew-requests/series', data),
   getReceived: () => api.get('/crew-requests/received'),
   getSent: () => api.get('/crew-requests/sent'),
   respond: (id, status, message) => api.put(`/crew-requests/${id}/respond`, { status, response_message: message }),
+  respondToSeries: (series, status, message) => api.put('/crew-requests/series/respond', { series, status, response_message: message }),
+  withdraw: (id, reason) => api.put(`/crew-requests/${id}/withdraw`, { reason }),
 };
 
 export const adminAPI = {

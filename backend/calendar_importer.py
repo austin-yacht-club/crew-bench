@@ -28,6 +28,9 @@ async def import_austin_yacht_club_calendar(url: str = "https://austinyachtclub.
         
         if not events:
             events = _parse_calendar_format(soup, url)
+        
+        # Post-process: detect series and enumerate events
+        events = _process_series_events(events)
             
     except httpx.HTTPError as e:
         errors.append(f"HTTP error fetching calendar: {str(e)}")
@@ -35,6 +38,72 @@ async def import_austin_yacht_club_calendar(url: str = "https://austinyachtclub.
         errors.append(f"Error parsing calendar: {str(e)}")
     
     return events, errors
+
+
+def _process_series_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Process events to detect series and enumerate them.
+    If an event name contains 'Series', extract series name and add enumeration.
+    """
+    # Group events by potential series name
+    series_groups = {}
+    non_series_events = []
+    
+    for event in events:
+        name = event.get('name', '')
+        series_name = _extract_series_name(name)
+        
+        if series_name:
+            if series_name not in series_groups:
+                series_groups[series_name] = []
+            series_groups[series_name].append(event)
+        else:
+            non_series_events.append(event)
+    
+    # Process series groups - sort by date and enumerate
+    processed_events = []
+    
+    for series_name, series_events in series_groups.items():
+        # Sort by date
+        series_events.sort(key=lambda e: e.get('date') or datetime.max)
+        
+        for i, event in enumerate(series_events, 1):
+            event['series'] = series_name
+            event['name'] = f"{series_name} #{i}"
+            event['series_index'] = i
+            event['series_total'] = len(series_events)
+            processed_events.append(event)
+    
+    # Add non-series events
+    processed_events.extend(non_series_events)
+    
+    # Sort all by date
+    processed_events.sort(key=lambda e: e.get('date') or datetime.max)
+    
+    return processed_events
+
+
+def _extract_series_name(name: str) -> str:
+    """
+    Extract series name from event name if it contains 'Series'.
+    Returns the series name or None if not a series event.
+    """
+    if not name:
+        return None
+    
+    # Check if 'series' is in the name (case insensitive)
+    if 'series' not in name.lower():
+        return None
+    
+    # Try to extract series name - typically "Something Series" or "Series Something"
+    # Remove any existing numbering like #1, Race 1, etc.
+    cleaned = re.sub(r'\s*#\d+\s*', ' ', name)
+    cleaned = re.sub(r'\s*Race\s*\d+\s*', ' ', cleaned, flags=re.I)
+    cleaned = re.sub(r'\s*Event\s*\d+\s*', ' ', cleaned, flags=re.I)
+    cleaned = re.sub(r'\s*\d+\s*$', '', cleaned)  # Trailing numbers
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    return cleaned if cleaned else None
 
 
 def _parse_table_format(soup: BeautifulSoup, source_url: str) -> List[Dict[str, Any]]:

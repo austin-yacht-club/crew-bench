@@ -60,6 +60,51 @@ const theme = createTheme({
         },
       },
     },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          margin: 16,
+          width: 'calc(100% - 32px)',
+          maxHeight: 'calc(100% - 32px)',
+        },
+      },
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          paddingTop: '16px !important',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          minWidth: 'auto',
+          paddingLeft: 12,
+          paddingRight: 12,
+          '@media (max-width: 600px)': {
+            fontSize: '0.8rem',
+            minHeight: 48,
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 600px)': {
+            height: 28,
+            fontSize: '0.75rem',
+          },
+        },
+        sizeSmall: {
+          '@media (max-width: 600px)': {
+            height: 24,
+            fontSize: '0.7rem',
+          },
+        },
+      },
+    },
   },
 });
 

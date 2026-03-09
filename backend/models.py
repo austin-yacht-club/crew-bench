@@ -16,6 +16,7 @@ class RequestStatus(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     DECLINED = "declined"
+    WITHDRAWN = "withdrawn"
 
 
 class ExperienceLevel(str, enum.Enum):
@@ -110,7 +111,9 @@ class Event(Base):
     end_date = Column(DateTime)
     location = Column(String)
     event_type = Column(String)  # race, regatta, cruise, etc.
-    series = Column(String)  # If part of a racing series
+    series = Column(String, index=True)  # If part of a racing series
+    series_index = Column(Integer)  # Position within series (1, 2, 3...)
+    series_total = Column(Integer)  # Total events in series at time of import
     external_url = Column(String)
     imported_from = Column(String)  # Source if imported
     is_active = Column(Boolean, default=True)

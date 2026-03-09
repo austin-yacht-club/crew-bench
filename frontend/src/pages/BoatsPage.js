@@ -179,12 +179,19 @@ const BoatsPage = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        gap: 2,
+        mb: 3 
+      }}>
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
             My Boats
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
             Manage your boats and find crew for events
           </Typography>
         </Box>
@@ -192,6 +199,8 @@ const BoatsPage = () => {
           variant="contained"
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
+          fullWidth
+          sx={{ maxWidth: { sm: 'auto' } }}
         >
           Add Boat
         </Button>

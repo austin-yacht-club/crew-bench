@@ -47,11 +47,16 @@ const LoginPage = () => {
       }}
     >
       <Container maxWidth="sm">
-        <Card sx={{ p: 2 }}>
+        <Card sx={{ p: { xs: 1, sm: 2 } }}>
           <CardContent>
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <Sailing sx={{ fontSize: 48, color: 'primary.main' }} />
-              <Typography variant="h4" component="h1" gutterBottom>
+            <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
+              <Sailing sx={{ fontSize: { xs: 40, sm: 48 }, color: 'primary.main' }} />
+              <Typography 
+                variant="h4" 
+                component="h1" 
+                gutterBottom
+                sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}
+              >
                 Welcome Back
               </Typography>
               <Typography variant="body2" color="text.secondary">

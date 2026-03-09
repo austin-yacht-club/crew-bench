@@ -43,32 +43,53 @@ const HomePage = () => {
         sx={{
           background: 'linear-gradient(135deg, #1565c0 0%, #00838f 100%)',
           color: 'white',
-          py: 8,
-          px: 3,
-          borderRadius: 3,
-          mb: 4,
+          py: { xs: 4, sm: 6, md: 8 },
+          px: { xs: 2, sm: 3 },
+          borderRadius: { xs: 2, md: 3 },
+          mb: { xs: 2, sm: 4 },
           textAlign: 'center',
         }}
       >
         <Container maxWidth="md">
-          <Sailing sx={{ fontSize: 64, mb: 2 }} />
-          <Typography variant="h3" component="h1" gutterBottom fontWeight={700}>
+          <Sailing sx={{ fontSize: { xs: 48, sm: 64 }, mb: 2 }} />
+          <Typography 
+            variant="h3" 
+            component="h1" 
+            gutterBottom 
+            fontWeight={700}
+            sx={{ fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}
+          >
             Crew Bench
           </Typography>
-          <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: { xs: 3, sm: 4 }, 
+              opacity: 0.9,
+              fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.25rem' },
+              px: { xs: 1, sm: 0 },
+            }}
+          >
             Connect sailing crews with boats for racing events. 
             Whether you're looking for crew or a boat to sail on, we've got you covered.
           </Typography>
           {!user && (
-            <Box>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', sm: 'row' }, 
+              justifyContent: 'center',
+              gap: { xs: 1, sm: 2 },
+              px: { xs: 2, sm: 0 },
+            }}>
               <Button
                 variant="contained"
                 size="large"
+                fullWidth
                 onClick={() => navigate('/register')}
                 sx={{
                   backgroundColor: 'white',
                   color: 'primary.main',
-                  mr: 2,
+                  maxWidth: { sm: 200 },
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' },
                 }}
               >
@@ -77,10 +98,12 @@ const HomePage = () => {
               <Button
                 variant="outlined"
                 size="large"
+                fullWidth
                 onClick={() => navigate('/register')}
                 sx={{
                   borderColor: 'white',
                   color: 'white',
+                  maxWidth: { sm: 200 },
                   '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' },
                 }}
               >

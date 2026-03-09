@@ -4,6 +4,35 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0] - 2026-03-09
+
+### Added
+
+#### Series Support
+- **Auto-detect series from calendar imports**: Events with "Series" in the title are automatically grouped and enumerated (e.g., "Spring Series #1", "Spring Series #2")
+- **Series availability**: Mark yourself available for all events in a series at once
+- **Series crew requests**: Skippers can invite crew for an entire series in one action
+- **Series response**: Crew can accept or decline all requests for a series at once
+- **Series view**: Events page now has "By Series" tab to view events grouped by series
+
+#### Withdrawal Feature
+- **Withdraw from events**: Both crew and skippers can withdraw from accepted crew positions
+- **Automatic availability restoration**: When withdrawing, the crew member is marked as available again for that event
+- **Withdrawal tracking**: Withdrawals are recorded with who withdrew (crew or skipper) and optional reason
+
+#### Responsive Design
+- **Mobile-optimized UI**: All pages now render properly on phones and tablets
+- **Responsive navigation**: Hamburger menu on mobile with slide-out drawer
+- **Scrollable tabs**: Tab bars scroll horizontally on small screens
+- **Stacking layouts**: Headers and buttons stack vertically on mobile
+- **Touch-friendly**: Adequate sizing and spacing for touch interaction
+
+### Improved
+
+#### Calendar Import
+- **Duplicate prevention**: Re-importing the same calendar URL won't create duplicate events
+- **Import tracking**: Shows count of skipped duplicates when importing
+
 ## [1.0.0] - 2026-03-09
 
 ### Added
