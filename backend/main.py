@@ -11,7 +11,8 @@ from database import engine, get_db, Base
 from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment
 import schemas
 from auth import (
-    get_password_hash, 
+    get_password_hash,
+    verify_password,
     authenticate_user, 
     create_access_token,
     get_current_active_user,
