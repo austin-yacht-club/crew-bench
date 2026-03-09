@@ -127,6 +127,7 @@ const FindCrewPage = () => {
 
   const experienceColor = (level) => {
     const colors = {
+      novice: 'default',
       beginner: 'default',
       intermediate: 'info',
       advanced: 'warning',

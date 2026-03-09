@@ -190,6 +190,7 @@ const RegisterPage = () => {
                       onChange={handleChange}
                       label="Experience Level"
                     >
+                      <MenuItem value="novice">Never Sailed Before</MenuItem>
                       <MenuItem value="beginner">Beginner</MenuItem>
                       <MenuItem value="intermediate">Intermediate</MenuItem>
                       <MenuItem value="advanced">Advanced</MenuItem>

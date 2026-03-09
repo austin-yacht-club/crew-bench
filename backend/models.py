@@ -20,6 +20,7 @@ class RequestStatus(str, enum.Enum):
 
 
 class ExperienceLevel(str, enum.Enum):
+    NOVICE = "novice"  # Never sailed before
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
