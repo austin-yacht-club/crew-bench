@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -19,10 +19,14 @@ import {
 } from '@mui/material';
 import { Sailing } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import { Recaptcha, getRecaptchaToken } from '../components/Recaptcha';
+
+const RECAPTCHA_SITE_KEY = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { register, login } = useAuth();
+  const recaptchaWidgetIdRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -52,6 +56,11 @@ const RegisterPage = () => {
       return;
     }
 
+    if (RECAPTCHA_SITE_KEY && !getRecaptchaToken(recaptchaWidgetIdRef.current)) {
+      setError('Please complete the security check (CAPTCHA) before registering.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -60,6 +69,9 @@ const RegisterPage = () => {
         registerData.weight = parseInt(registerData.weight);
       } else {
         delete registerData.weight;
+      }
+      if (RECAPTCHA_SITE_KEY) {
+        registerData.captcha_token = getRecaptchaToken(recaptchaWidgetIdRef.current);
       }
       
       await register(registerData);
@@ -256,6 +268,15 @@ const RegisterPage = () => {
                     placeholder="Tell us about your sailing experience..."
                   />
                 </Grid>
+                {RECAPTCHA_SITE_KEY && (
+                  <Grid item xs={12}>
+                    <Recaptcha
+                      siteKey={RECAPTCHA_SITE_KEY}
+                      onReady={(widgetId) => { recaptchaWidgetIdRef.current = widgetId; }}
+                      sx={{ mt: 1 }}
+                    />
+                  </Grid>
+                )}
               </Grid>
 
               <Button

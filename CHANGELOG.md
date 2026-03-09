@@ -4,6 +4,18 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.0] - 2026-03-09
+
+### Added
+
+#### Registration CAPTCHA
+- **reCAPTCHA v2 on sign-up**: New user registration can require completing a CAPTCHA (Google reCAPTCHA v2 checkbox)
+- **Backend**: Optional `RECAPTCHA_SECRET_KEY`; when set, `/api/auth/register` verifies the token via Google siteverify before creating the account
+- **Frontend**: `Recaptcha` component and registration form send `captcha_token` when `REACT_APP_RECAPTCHA_SITE_KEY` is set
+- **Docs**: README env vars for reCAPTCHA (secret and site key). If neither is set, registration works without CAPTCHA (e.g. local dev)
+
+---
+
 ## [1.3.0] - 2026-03-09
 
 ### Added

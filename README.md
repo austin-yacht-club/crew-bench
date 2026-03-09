@@ -132,10 +132,12 @@ npm start
 - `SECRET_KEY` - JWT secret key
 - `ADMIN_EMAIL` - Default admin email
 - `ADMIN_PASSWORD` - Default admin password
+- `RECAPTCHA_SECRET_KEY` - Optional. reCAPTCHA v2 secret key for registration CAPTCHA. If set, new users must pass CAPTCHA verification.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Optional. Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
 
 ### Frontend
 - `REACT_APP_API_URL` - Backend API URL
+- `REACT_APP_RECAPTCHA_SITE_KEY` - Optional. reCAPTCHA v2 site key (must be set if backend uses `RECAPTCHA_SECRET_KEY`).
 
 ## License
 

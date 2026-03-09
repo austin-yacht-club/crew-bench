@@ -25,6 +25,11 @@ class UserCreate(UserBase):
     password: str
 
 
+class RegisterRequest(UserCreate):
+    """Registration body: user fields + optional CAPTCHA token (required if RECAPTCHA_SECRET_KEY is set)."""
+    captcha_token: Optional[str] = None
+
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None

@@ -51,6 +51,13 @@ This document tracks planned features, improvements, and known issues.
 - [x] Availability calendar view (month view on Events page with availability indicators)
 - [x] Experience level "Never sailed before" (novice)
 
+### v1.3.0 Additions
+- [x] In-app notification system (bell, list, mark read, backend API)
+- [x] Push notifications (mobile web; service worker, VAPID subscribe)
+
+### v1.4.0 Additions
+- [x] CAPTCHA protection on new user registration (reCAPTCHA v2, optional via env)
+
 ---
 
 ## Planned Features
@@ -60,8 +67,6 @@ This document tracks planned features, improvements, and known issues.
 #### Notifications
 - [ ] Email notifications for new crew requests
 - [ ] Email notifications when requests are accepted/declined
-- [ ] In-app notification system
-- [ ] Push notifications (mobile web)
 
 #### Event Management
 - [ ] Recurring events (weekly/monthly series)

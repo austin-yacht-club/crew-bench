@@ -20,8 +20,32 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_preview
+import httpx
 
 Base.metadata.create_all(bind=engine)
+
+RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
+
+
+def _verify_recaptcha(token: Optional[str]) -> bool:
+    """Verify reCAPTCHA v2 response token. Returns True if valid or if RECAPTCHA is not configured."""
+    secret = os.getenv("RECAPTCHA_SECRET_KEY")
+    if not secret:
+        return True
+    if not token or not token.strip():
+        return False
+    try:
+        with httpx.Client() as client:
+            r = client.post(
+                RECAPTCHA_VERIFY_URL,
+                data={"secret": secret, "response": token},
+                timeout=10.0,
+            )
+            r.raise_for_status()
+            data = r.json()
+            return data.get("success") is True
+    except Exception:
+        return False
 
 app = FastAPI(
     title="Crew Bench",
@@ -106,7 +130,13 @@ def _create_notification_and_push(
 
 # Auth Routes
 @app.post("/api/auth/register", response_model=schemas.User)
-def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(body: schemas.RegisterRequest, db: Session = Depends(get_db)):
+    if not _verify_recaptcha(body.captcha_token):
+        raise HTTPException(
+            status_code=400,
+            detail="CAPTCHA verification failed. Please complete the security check and try again.",
+        )
+    user = body  # RegisterRequest extends UserCreate; exclude captcha_token when building User
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
