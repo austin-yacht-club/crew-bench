@@ -125,6 +125,10 @@ class Boat(BoatBase):
         from_attributes = True
 
 
+class FavoriteBoatAdd(BaseModel):
+    boat_id: int
+
+
 class EventBase(BaseModel):
     name: str
     description: Optional[str] = None

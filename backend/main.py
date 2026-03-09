@@ -1,14 +1,22 @@
+import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from database import engine, get_db, Base
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription
+from log_config import configure_logging
+
+logger = configure_logging("crew_bench")
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat
 import schemas
 from auth import (
     get_password_hash,
@@ -44,7 +52,8 @@ def _verify_recaptcha(token: Optional[str]) -> bool:
             r.raise_for_status()
             data = r.json()
             return data.get("success") is True
-    except Exception:
+    except Exception as e:
+        logger.warning("reCAPTCHA verification failed: %s", e)
         return False
 
 app = FastAPI(
@@ -60,6 +69,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log each request: method, path, status code, duration."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        path = request.url.path
+        if request.query_params:
+            path = f"{path}?{request.query_params}"
+        level = logging.WARNING if response.status_code >= 500 else logging.INFO
+        logger.log(
+            level,
+            "%s %s %d %.1fms",
+            request.method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Log unhandled exceptions with traceback and return 500."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.on_event("startup")
@@ -81,7 +124,7 @@ async def startup_event():
         )
         db.add(admin_user)
         db.commit()
-        print(f"Created default admin user: {admin_email}")
+        logger.info("Created default admin user: %s", admin_email)
     db.close()
 
 
@@ -121,10 +164,10 @@ def _create_notification_and_push(
                         vapid_private_key=vapid_private,
                         vapid_claims={"sub": "mailto:admin@crewbench.app"},
                     )
-                except WebPushException:
-                    pass
-        except Exception:
-            pass
+                except WebPushException as e:
+                    logger.debug("Web Push failed for subscription: %s", e)
+        except Exception as e:
+            logger.warning("Web Push send failed: %s", e)
     return notification
 
 
@@ -374,6 +417,57 @@ def update_boat(
     db.commit()
     db.refresh(boat)
     return boat
+
+
+@app.get("/api/favorite-boats", response_model=List[schemas.Boat])
+def list_favorite_boats(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """List boats the current user has favorited (for quick access when marking availability)."""
+    favs = db.query(FavoriteBoat).filter(FavoriteBoat.user_id == current_user.id).all()
+    boat_ids = [f.boat_id for f in favs]
+    if not boat_ids:
+        return []
+    boats = db.query(Boat).filter(Boat.id.in_(boat_ids)).all()
+    order = {bid: i for i, bid in enumerate(boat_ids)}
+    boats.sort(key=lambda b: order.get(b.id, 999))
+    return boats
+
+
+@app.post("/api/favorite-boats", response_model=schemas.Boat)
+def add_favorite_boat(
+    body: schemas.FavoriteBoatAdd,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    boat = db.query(Boat).filter(Boat.id == body.boat_id).first()
+    if not boat:
+        raise HTTPException(status_code=404, detail="Boat not found")
+    existing = db.query(FavoriteBoat).filter(
+        FavoriteBoat.user_id == current_user.id,
+        FavoriteBoat.boat_id == body.boat_id,
+    ).first()
+    if existing:
+        return boat
+    fav = FavoriteBoat(user_id=current_user.id, boat_id=body.boat_id)
+    db.add(fav)
+    db.commit()
+    return boat
+
+
+@app.delete("/api/favorite-boats/{boat_id}")
+def remove_favorite_boat(
+    boat_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    deleted = db.query(FavoriteBoat).filter(
+        FavoriteBoat.user_id == current_user.id,
+        FavoriteBoat.boat_id == boat_id,
+    ).delete()
+    db.commit()
+    return {"ok": True}
 
 
 @app.delete("/api/boats/{boat_id}")

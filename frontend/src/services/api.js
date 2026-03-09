@@ -53,6 +53,12 @@ export const boatsAPI = {
   delete: (id) => api.delete(`/boats/${id}`),
 };
 
+export const favoriteBoatsAPI = {
+  list: () => api.get('/favorite-boats'),
+  add: (boatId) => api.post('/favorite-boats', { boat_id: boatId }),
+  remove: (boatId) => api.delete(`/favorite-boats/${boatId}`),
+};
+
 export const fleetsAPI = {
   list: () => api.get('/fleets'),
   get: (id) => api.get(`/fleets/${id}`),

@@ -4,6 +4,23 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.0] - 2026-03-09
+
+### Added
+
+#### Favorite boats (crew)
+- **Favorite boats**: Crew can star boats for quick access when marking availability
+- **Backend**: FavoriteBoat model and API (GET/POST/DELETE `/api/favorite-boats`)
+- **Events page**: "Quick add from your favorites" chips in Mark Availability (specific boats); star in boat dropdown to add/remove favorite; "Add all favorites" button
+
+#### Logging
+- **Centralized logging**: `log_config.py` configures level (LOG_LEVEL), format, and optional rotating file (LOG_FILE)
+- **Request logging**: Middleware logs method, path, status code, and duration per request
+- **Exception logging**: Unhandled exceptions logged with traceback; reCAPTCHA and Web Push failures logged
+- **Docs**: README env vars for LOG_LEVEL, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+
+---
+
 ## [1.4.0] - 2026-03-09
 
 ### Added

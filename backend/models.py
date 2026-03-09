@@ -69,6 +69,7 @@ class User(Base):
     boats = relationship("Boat", back_populates="owner")
     crew_requests = relationship("CrewRequest", foreign_keys="CrewRequest.crew_id", back_populates="crew")
     available_for_events = relationship("CrewAvailability", back_populates="crew")
+    favorite_boats = relationship("FavoriteBoat", back_populates="user", foreign_keys="FavoriteBoat.user_id")
 
 
 class Fleet(Base):
@@ -102,6 +103,7 @@ class Boat(Base):
     fleet = relationship("Fleet", back_populates="boats")
     crew_requests = relationship("CrewRequest", back_populates="boat")
     events = relationship("Event", secondary=event_boats, back_populates="boats")
+    favorited_by = relationship("FavoriteBoat", back_populates="boat")
 
 
 class Event(Base):
@@ -218,6 +220,19 @@ class CrewRating(Base):
     crew = relationship("User", foreign_keys=[crew_id])
     event = relationship("Event")
     boat = relationship("Boat")
+
+
+class FavoriteBoat(Base):
+    """Crew's favorite boats for quick access when marking availability."""
+    __tablename__ = "favorite_boats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    boat_id = Column(Integer, ForeignKey("boats.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="favorite_boats")
+    boat = relationship("Boat", back_populates="favorited_by")
 
 
 class BoatRating(Base):

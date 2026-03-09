@@ -58,6 +58,10 @@ This document tracks planned features, improvements, and known issues.
 ### v1.4.0 Additions
 - [x] CAPTCHA protection on new user registration (reCAPTCHA v2, optional via env)
 
+### v1.5.0 Additions
+- [x] Favorite boats for crew (quick add when marking availability; star to add/remove)
+- [x] Proper logging (level, format, optional file; request middleware; exception logging)
+
 ---
 
 ## Planned Features
@@ -76,7 +80,7 @@ This document tracks planned features, improvements, and known issues.
 
 #### Crew Features
 - [x] Crew ratings/reviews after events (and boat ratings by crew)
-- [ ] Favorite boats (quick access to preferred boats)
+- [x] Favorite boats (quick access to preferred boats)
 - [x] Availability calendar view
 - [x] Position preferences (bow, rail, trimmer, etc.)
 

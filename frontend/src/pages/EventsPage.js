@@ -43,6 +43,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sailing,
+  Star,
+  StarBorder,
 } from '@mui/icons-material';
 import {
   format,
@@ -57,7 +59,7 @@ import {
   eachDayOfInterval,
   isToday,
 } from 'date-fns';
-import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI, skipperCommitmentsAPI } from '../services/api';
+import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI, skipperCommitmentsAPI, favoriteBoatsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 
 const EventsPage = () => {
@@ -82,6 +84,8 @@ const EventsPage = () => {
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [skipperCommitments, setSkipperCommitments] = useState([]);
+  const [favoriteBoats, setFavoriteBoats] = useState([]);
+  const [favoriteBoatIds, setFavoriteBoatIds] = useState(new Set());
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
@@ -111,6 +115,35 @@ const EventsPage = () => {
     loadData();
   }, [user]);
 
+  const toggleFavoriteBoat = async (boat, e) => {
+    if (e) e.stopPropagation();
+    const id = boat.id;
+    const isFav = favoriteBoatIds.has(id);
+    try {
+      if (isFav) {
+        await favoriteBoatsAPI.remove(id);
+        setFavoriteBoats((prev) => prev.filter((b) => b.id !== id));
+        setFavoriteBoatIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      } else {
+        await favoriteBoatsAPI.add(id);
+        setFavoriteBoats((prev) => [...prev.filter((b) => b.id !== id), boat]);
+        setFavoriteBoatIds((prev) => new Set([...prev, id]));
+      }
+    } catch (_) {}
+  };
+
+  const addFavoriteBoatsToSelection = () => {
+    const combined = [...selectedBoats];
+    favoriteBoats.forEach((b) => {
+      if (!combined.some((x) => x.id === b.id)) combined.push(b);
+    });
+    setSelectedBoats(combined);
+  };
+
   const loadData = async () => {
     try {
       const [eventsRes, boatsRes, fleetsRes, seriesRes] = await Promise.all([
@@ -125,12 +158,15 @@ const EventsPage = () => {
       setSeriesList(seriesRes.data);
 
       if (user) {
-        const [availRes, commitmentsRes] = await Promise.all([
+        const [availRes, commitmentsRes, favRes] = await Promise.all([
           availabilityAPI.getMy(),
           skipperCommitmentsAPI.getMy(),
+          favoriteBoatsAPI.list().catch(() => ({ data: [] })),
         ]);
         setMyAvailability(availRes.data);
         setSkipperCommitments(commitmentsRes.data);
+        setFavoriteBoats(favRes.data || []);
+        setFavoriteBoatIds(new Set((favRes.data || []).map((b) => b.id)));
       }
     } catch (err) {
       setError('Failed to load events');
@@ -776,31 +812,82 @@ const EventsPage = () => {
           </FormControl>
 
           {availabilityType === 'boats' && (
-            <Autocomplete
-              multiple
-              options={boats}
-              getOptionLabel={(option) => `${option.name}${option.sail_number ? ` (${option.sail_number})` : ''}`}
-              value={selectedBoats}
-              onChange={(_, newValue) => setSelectedBoats(newValue)}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Select Boats"
-                  placeholder="Choose boats you're interested in"
-                  helperText="Select the specific boats you'd like to crew on"
-                />
+            <>
+              {favoriteBoats.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Quick add from your favorites
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                    {favoriteBoats.map((b) => {
+                      const isSelected = selectedBoats.some((x) => x.id === b.id);
+                      return (
+                        <Chip
+                          key={b.id}
+                          label={b.name}
+                          size="small"
+                          onClick={() => {
+                            if (isSelected) return;
+                            setSelectedBoats((prev) => [...prev.filter((x) => x.id !== b.id), b]);
+                          }}
+                          onDelete={(e) => toggleFavoriteBoat(b, e)}
+                          deleteIcon={<Star sx={{ fontSize: 16 }} />}
+                          variant={isSelected ? 'filled' : 'outlined'}
+                          color={isSelected ? 'primary' : 'default'}
+                        />
+                      );
+                    })}
+                    {favoriteBoats.some((b) => !selectedBoats.some((x) => x.id === b.id)) && (
+                      <Button size="small" onClick={addFavoriteBoatsToSelection}>
+                        Add all favorites
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
               )}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    label={option.name}
-                    {...getTagProps({ index })}
-                    key={option.id}
+              <Autocomplete
+                multiple
+                options={boats}
+                getOptionLabel={(option) => `${option.name}${option.sail_number ? ` (${option.sail_number})` : ''}`}
+                value={selectedBoats}
+                onChange={(_, newValue) => setSelectedBoats(newValue)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Select Boats"
+                    placeholder="Choose boats you're interested in"
+                    helperText="Select the specific boats you'd like to crew on. Star to add to favorites for next time."
                   />
-                ))
-              }
-              sx={{ mb: 2 }}
-            />
+                )}
+                renderOption={(props, option) => {
+                  const isFav = favoriteBoatIds.has(option.id);
+                  return (
+                    <li {...props} key={option.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                        <span>{option.name}{option.sail_number ? ` (${option.sail_number})` : ''}</span>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => toggleFavoriteBoat(option, e)}
+                          aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          {isFav ? <Star color="primary" /> : <StarBorder />}
+                        </IconButton>
+                      </Box>
+                    </li>
+                  );
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                    />
+                  ))
+                }
+                sx={{ mb: 2 }}
+              />
+            </>
           )}
 
           {availabilityType === 'fleets' && (
