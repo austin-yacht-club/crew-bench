@@ -40,6 +40,8 @@ export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   getMe: () => api.get('/auth/me'),
   updateMe: (userData) => api.put('/auth/me', userData),
+  changePassword: (currentPassword, newPassword) => 
+    api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
 };
 
 export const boatsAPI = {

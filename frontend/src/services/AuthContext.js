@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -13,6 +14,9 @@ export const AuthProvider = ({ children }) => {
       authAPI.getMe()
         .then((response) => {
           setUser(response.data);
+          if (response.data.must_change_password) {
+            setMustChangePassword(true);
+          }
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -30,7 +34,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', response.data.access_token);
     const userResponse = await authAPI.getMe();
     setUser(userResponse.data);
-    return userResponse.data;
+    
+    if (response.data.must_change_password) {
+      setMustChangePassword(true);
+    }
+    
+    return { user: userResponse.data, mustChangePassword: response.data.must_change_password };
   };
 
   const register = async (userData) => {
@@ -41,6 +50,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    setMustChangePassword(false);
   };
 
   const updateUser = async (userData) => {
@@ -49,8 +59,15 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    await authAPI.changePassword(currentPassword, newPassword);
+    setMustChangePassword(false);
+    const userResponse = await authAPI.getMe();
+    setUser(userResponse.data);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, mustChangePassword, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

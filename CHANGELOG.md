@@ -39,6 +39,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **My Schedule updates**: New "Sailing My Boat" tab shows events where you're sailing your own boat
 - **Summary cards**: Updated to show breakdown of events as crew, sailing own boat, and with crew
 
+#### Password Management
+- **Change password**: Users can change their password from the Profile page
+- **Required password change**: Admin users must change their password on first login
+- **Password validation**: Minimum 8 character requirement with confirmation field
+
 ### Improved
 
 #### Calendar Import

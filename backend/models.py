@@ -62,6 +62,7 @@ class User(Base):
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     boats = relationship("Boat", back_populates="owner")

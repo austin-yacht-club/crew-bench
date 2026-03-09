@@ -43,10 +43,16 @@ class User(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    must_change_password: bool = False
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
 
 
 class FleetBase(BaseModel):
@@ -229,6 +235,7 @@ class CrewRequest(CrewRequestBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    must_change_password: bool = False
 
 
 class TokenData(BaseModel):

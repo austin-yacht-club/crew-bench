@@ -28,8 +28,12 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/events');
+      const result = await login(email, password);
+      if (result.mustChangePassword) {
+        navigate('/profile?changePassword=required');
+      } else {
+        navigate('/events');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.');
     } finally {

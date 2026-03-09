@@ -51,7 +51,8 @@ async def startup_event():
             hashed_password=get_password_hash(admin_password),
             name="Admin",
             role="admin",
-            is_admin=True
+            is_admin=True,
+            must_change_password=True
         )
         db.add(admin_user)
         db.commit()
@@ -97,7 +98,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "must_change_password": user.must_change_password or False
+    }
 
 
 @app.get("/api/auth/me", response_model=schemas.User)
@@ -117,6 +122,24 @@ def update_current_user(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@app.post("/api/auth/change-password")
+def change_password(
+    password_data: schemas.PasswordChange,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(password_data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    if len(password_data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    
+    current_user.hashed_password = get_password_hash(password_data.new_password)
+    current_user.must_change_password = False
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 
 # Boat Routes

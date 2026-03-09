@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -20,12 +21,18 @@ import {
   Divider,
   IconButton,
   Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
-import { Person, Save, ContactMail, PhotoCamera, Delete } from '@mui/icons-material';
+import { Person, Save, ContactMail, PhotoCamera, Delete, Lock, VpnKey } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 
 const ProfilePage = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, mustChangePassword, changePassword } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -44,6 +51,52 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const isRequiredPasswordChange = searchParams.get('changePassword') === 'required' || mustChangePassword;
+
+  useEffect(() => {
+    if (isRequiredPasswordChange) {
+      setPasswordDialogOpen(true);
+    }
+  }, [isRequiredPasswordChange]);
+
+  const handlePasswordChange = async () => {
+    setPasswordError('');
+    
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    
+    setPasswordLoading(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setPasswordDialogOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setSuccess('Password changed successfully');
+      if (searchParams.get('changePassword') === 'required') {
+        navigate('/profile', { replace: true });
+      }
+    } catch (err) {
+      setPasswordError(err.response?.data?.detail || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -392,20 +445,92 @@ const ProfilePage = () => {
                   </Grid>
                 </Grid>
 
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={<Save />}
-                  disabled={loading}
-                  sx={{ mt: 3 }}
-                >
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={<Save />}
+                    disabled={loading}
+                  >
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<VpnKey />}
+                    onClick={() => setPasswordDialogOpen(true)}
+                  >
+                    Change Password
+                  </Button>
+                </Box>
               </form>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog 
+        open={passwordDialogOpen} 
+        onClose={isRequiredPasswordChange ? undefined : () => setPasswordDialogOpen(false)}
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Lock color="primary" />
+          {isRequiredPasswordChange ? 'Password Change Required' : 'Change Password'}
+        </DialogTitle>
+        <DialogContent>
+          {isRequiredPasswordChange && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              For security reasons, you must change your password before continuing.
+            </Alert>
+          )}
+          {passwordError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {passwordError}
+            </Alert>
+          )}
+          <TextField
+            fullWidth
+            type="password"
+            label="Current Password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            margin="normal"
+            autoFocus
+          />
+          <TextField
+            fullWidth
+            type="password"
+            label="New Password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            margin="normal"
+            helperText="Must be at least 8 characters"
+          />
+          <TextField
+            fullWidth
+            type="password"
+            label="Confirm New Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            margin="normal"
+            error={confirmPassword && newPassword !== confirmPassword}
+            helperText={confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match' : ''}
+          />
+        </DialogContent>
+        <DialogActions>
+          {!isRequiredPasswordChange && (
+            <Button onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+          )}
+          <Button
+            variant="contained"
+            onClick={handlePasswordChange}
+            disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
+          >
+            {passwordLoading ? 'Changing...' : 'Change Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
