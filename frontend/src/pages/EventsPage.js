@@ -21,7 +21,9 @@ import {
   Autocomplete,
   Tabs,
   Tab,
-  Divider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -31,6 +33,7 @@ import {
   DirectionsBoat,
   Flag,
   PlaylistAddCheck,
+  ExpandMore,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI } from '../services/api';
@@ -334,53 +337,92 @@ const EventsPage = () => {
 
           {viewTab === 1 && (
             <Box>
-              {Object.entries(eventsBySeries).map(([seriesName, seriesEvents]) => (
-                <Box key={seriesName} sx={{ mb: 4 }}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: { xs: 'flex-start', sm: 'center' }, 
-                    justifyContent: 'space-between', 
-                    gap: { xs: 1, sm: 2 },
-                    mb: 2 
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
-                        {seriesName}
-                      </Typography>
-                      <Chip
-                        label={`${seriesEvents.length} events`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Box>
-                    {user && seriesName !== 'Other Events' && (
-                      isSeriesFullyAvailable(seriesName) ? (
+              {Object.entries(eventsBySeries).map(([seriesName, seriesEvents]) => {
+                const availableCount = seriesEvents.filter(e => isAvailableFor(e.id)).length;
+                const firstEventDate = seriesEvents[0]?.date;
+                const lastEventDate = seriesEvents[seriesEvents.length - 1]?.date;
+                
+                return (
+                  <Accordion 
+                    key={seriesName} 
+                    sx={{ 
+                      mb: 1,
+                      '&:before': { display: 'none' },
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    <AccordionSummary 
+                      expandIcon={<ExpandMore />}
+                      sx={{ 
+                        '& .MuiAccordionSummary-content': { 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: { xs: 'flex-start', sm: 'center' },
+                          gap: { xs: 1, sm: 2 },
+                          my: 1,
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flexGrow: 1 }}>
+                        <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.125rem' }, fontWeight: 600 }}>
+                          {seriesName}
+                        </Typography>
                         <Chip
-                          icon={<CheckCircle />}
-                          label="Available for all"
-                          color="success"
+                          label={`${seriesEvents.length} events`}
                           size="small"
-                        />
-                      ) : (
-                        <Button
                           variant="outlined"
-                          size="small"
-                          startIcon={<PlaylistAddCheck />}
-                          onClick={() => handleOpenSeriesDialog(seriesName)}
-                          sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
-                        >
-                          Mark Available for Series
-                        </Button>
-                      )
-                    )}
-                  </Box>
-                  <Divider sx={{ mb: 2 }} />
-                  <Grid container spacing={3}>
-                    {seriesEvents.map(renderEventCard)}
-                  </Grid>
-                </Box>
-              ))}
+                          sx={{ height: 24 }}
+                        />
+                        {availableCount > 0 && (
+                          <Chip
+                            icon={<CheckCircle sx={{ fontSize: 14 }} />}
+                            label={availableCount === seriesEvents.length 
+                              ? 'Available for all' 
+                              : `${availableCount}/${seriesEvents.length} available`}
+                            size="small"
+                            color="success"
+                            variant={availableCount === seriesEvents.length ? 'filled' : 'outlined'}
+                            sx={{ height: 24 }}
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {firstEventDate && (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                            {format(new Date(firstEventDate), 'MMM d')}
+                            {lastEventDate && firstEventDate !== lastEventDate && (
+                              <> - {format(new Date(lastEventDate), 'MMM d, yyyy')}</>
+                            )}
+                          </Typography>
+                        )}
+                        {user && seriesName !== 'Other Events' && !isSeriesFullyAvailable(seriesName) && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<PlaylistAddCheck />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenSeriesDialog(seriesName);
+                            }}
+                            sx={{ 
+                              fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                              py: 0.5,
+                              px: 1,
+                              minWidth: 'auto',
+                            }}
+                          >
+                            Mark All
+                          </Button>
+                        )}
+                      </Box>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 0, pb: 2 }}>
+                      <Grid container spacing={2}>
+                        {seriesEvents.map(renderEventCard)}
+                      </Grid>
+                    </AccordionDetails>
+                  </Accordion>
+                );
+              })}
             </Box>
           )}
         </>
