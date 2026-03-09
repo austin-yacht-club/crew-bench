@@ -33,6 +33,12 @@ event_boats = Table(
 )
 
 
+class ContactPreference(str, enum.Enum):
+    EMAIL = "email"
+    PHONE = "phone"
+    EITHER = "either"
+
+
 class User(Base):
     __tablename__ = "users"
     
@@ -46,6 +52,9 @@ class User(Base):
     bio = Column(Text)
     weight = Column(Integer)  # Important for sailboat balance
     certifications = Column(Text)  # Sailing certifications
+    allow_email_contact = Column(Boolean, default=True)
+    allow_phone_contact = Column(Boolean, default=False)
+    contact_preference = Column(String, default=ContactPreference.EMAIL.value)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

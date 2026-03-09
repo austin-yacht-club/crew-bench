@@ -14,8 +14,12 @@ import {
   MenuItem,
   Avatar,
   Chip,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
+  Divider,
 } from '@mui/material';
-import { Person, Save } from '@mui/icons-material';
+import { Person, Save, ContactMail } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 
 const ProfilePage = () => {
@@ -28,13 +32,20 @@ const ProfilePage = () => {
     bio: user?.bio || '',
     weight: user?.weight || '',
     certifications: user?.certifications || '',
+    allow_email_contact: user?.allow_email_contact ?? true,
+    allow_phone_contact: user?.allow_phone_contact ?? false,
+    contact_preference: user?.contact_preference || 'email',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData({ 
+      ...formData, 
+      [name]: type === 'checkbox' ? checked : value 
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -111,7 +122,7 @@ const ProfilePage = () => {
         </Grid>
 
         <Grid item xs={12} md={8}>
-          <Card>
+          <Card sx={{ mb: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                 <Person sx={{ mr: 1, color: 'primary.main' }} />
@@ -200,6 +211,67 @@ const ProfilePage = () => {
                       rows={4}
                       placeholder="Tell us about your sailing experience..."
                     />
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 3 }} />
+
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ContactMail sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="h6">Contact Preferences</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Control how other sailors can contact you
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.allow_email_contact}
+                            onChange={handleChange}
+                            name="allow_email_contact"
+                          />
+                        }
+                        label="Allow contact via email"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.allow_phone_contact}
+                            onChange={handleChange}
+                            name="allow_phone_contact"
+                            disabled={!formData.phone}
+                          />
+                        }
+                        label={
+                          formData.phone 
+                            ? "Allow contact via phone" 
+                            : "Allow contact via phone (add phone number first)"
+                        }
+                      />
+                    </FormGroup>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Preferred Contact Method</InputLabel>
+                      <Select
+                        name="contact_preference"
+                        value={formData.contact_preference}
+                        onChange={handleChange}
+                        label="Preferred Contact Method"
+                      >
+                        <MenuItem value="email">Email</MenuItem>
+                        <MenuItem value="phone" disabled={!formData.phone}>
+                          Phone {!formData.phone && '(add phone number)'}
+                        </MenuItem>
+                        <MenuItem value="either" disabled={!formData.phone}>
+                          Either {!formData.phone && '(add phone number)'}
+                        </MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
                 </Grid>
 
