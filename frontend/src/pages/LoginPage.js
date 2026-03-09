@@ -55,7 +55,7 @@ const LoginPage = () => {
                 Welcome Back
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Sign in to your Crew Match account
+                Sign in to your Crew Bench account
               </Typography>
             </Box>
 

@@ -84,7 +84,7 @@ const RegisterPage = () => {
             <Box sx={{ textAlign: 'center', mb: 4 }}>
               <Sailing sx={{ fontSize: 48, color: 'primary.main' }} />
               <Typography variant="h4" component="h1" gutterBottom>
-                Join Crew Match
+                Join Crew Bench
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Create your account to start connecting with sailors

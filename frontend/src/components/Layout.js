@@ -63,7 +63,7 @@ const Layout = () => {
     <Box sx={{ mt: 2 }}>
       <Box sx={{ px: 3, pb: 2 }}>
         <Typography variant="h6" color="primary" sx={{ fontWeight: 700 }}>
-          Crew Match
+          Crew Bench
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Find your sailing crew
@@ -124,7 +124,7 @@ const Layout = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
             <SailingIcon sx={{ mr: 1, color: 'primary.main' }} />
             <Typography variant="h6" component="div" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Crew Match
+              Crew Bench
             </Typography>
           </Box>
           {user ? (

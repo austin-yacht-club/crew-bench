@@ -23,7 +23,7 @@ from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Crew Match",
+    title="Crew Bench",
     description="Match sailing crew to boats for racing events",
     version="1.0.0"
 )
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Create default admin user on startup if it doesn't exist."""
     db = next(get_db())
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@crewmatch.app")
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@crewbench.app")
     admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
     
     existing_admin = db.query(User).filter(User.email == admin_email).first()

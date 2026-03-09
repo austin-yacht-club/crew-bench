@@ -1,4 +1,4 @@
-# Crew Match
+# Crew Bench
 
 A web application for matching sailing crew to boats for racing events.
 
@@ -30,7 +30,7 @@ A web application for matching sailing crew to boats for racing events.
 1. Clone the repository and navigate to the project directory:
 
 ```bash
-cd crew-match-app
+cd crew-bench
 ```
 
 2. Start the application with Docker Compose:
@@ -46,7 +46,7 @@ docker-compose up --build
 
 ### Default Admin Account
 
-- Email: `admin@crewmatch.app`
+- Email: `admin@crewbench.app`
 - Password: `admin123`
 
 ## User Roles

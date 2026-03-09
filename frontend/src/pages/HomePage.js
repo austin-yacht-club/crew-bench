@@ -53,7 +53,7 @@ const HomePage = () => {
         <Container maxWidth="md">
           <Sailing sx={{ fontSize: 64, mb: 2 }} />
           <Typography variant="h3" component="h1" gutterBottom fontWeight={700}>
-            Crew Match
+            Crew Bench
           </Typography>
           <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
             Connect sailing crews with boats for racing events. 
