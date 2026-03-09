@@ -706,9 +706,75 @@ def respond_to_request(
         if availability:
             availability.is_matched = True
     
+    # If declined and this was a primary request, promote next waitlisted crew
+    if response.status == RequestStatus.DECLINED.value and crew_request.waitlist_position is None:
+        next_waitlisted = db.query(CrewRequest).filter(
+            CrewRequest.boat_id == crew_request.boat_id,
+            CrewRequest.event_id == crew_request.event_id,
+            CrewRequest.waitlist_position != None,
+            CrewRequest.status == RequestStatus.PENDING.value
+        ).order_by(CrewRequest.waitlist_position).first()
+        
+        if next_waitlisted:
+            # Promote from waitlist to primary
+            next_waitlisted.waitlist_position = None
+            # Reorder remaining waitlist
+            remaining = db.query(CrewRequest).filter(
+                CrewRequest.boat_id == crew_request.boat_id,
+                CrewRequest.event_id == crew_request.event_id,
+                CrewRequest.waitlist_position != None,
+                CrewRequest.status == RequestStatus.PENDING.value
+            ).order_by(CrewRequest.waitlist_position).all()
+            for i, req in enumerate(remaining, start=1):
+                req.waitlist_position = i
+    
     db.commit()
     db.refresh(crew_request)
     return crew_request
+
+
+@app.get("/api/crew-requests/waitlist/{boat_id}/{event_id}", response_model=List[schemas.CrewRequest])
+def get_waitlist(
+    boat_id: int,
+    event_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get the waitlist for a specific boat/event combination."""
+    boat = db.query(Boat).filter(Boat.id == boat_id).first()
+    if not boat:
+        raise HTTPException(status_code=404, detail="Boat not found")
+    if boat.owner_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to view this waitlist")
+    
+    waitlist = db.query(CrewRequest).options(
+        joinedload(CrewRequest.crew),
+        joinedload(CrewRequest.event)
+    ).filter(
+        CrewRequest.boat_id == boat_id,
+        CrewRequest.event_id == event_id,
+        CrewRequest.waitlist_position != None,
+        CrewRequest.status == RequestStatus.PENDING.value
+    ).order_by(CrewRequest.waitlist_position).all()
+    
+    return waitlist
+
+
+@app.get("/api/crew-requests/next-waitlist-position/{boat_id}/{event_id}")
+def get_next_waitlist_position(
+    boat_id: int,
+    event_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get the next available waitlist position for a boat/event."""
+    max_position = db.query(CrewRequest).filter(
+        CrewRequest.boat_id == boat_id,
+        CrewRequest.event_id == event_id,
+        CrewRequest.waitlist_position != None
+    ).count()
+    
+    return {"next_position": max_position + 1}
 
 
 # Withdrawal Routes

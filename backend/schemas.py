@@ -200,7 +200,7 @@ class CrewRequestBase(BaseModel):
 
 
 class CrewRequestCreate(CrewRequestBase):
-    pass
+    waitlist_position: Optional[int] = None  # null = primary, 1+ = waitlist
 
 
 class SeriesCrewRequestCreate(BaseModel):
@@ -208,6 +208,7 @@ class SeriesCrewRequestCreate(BaseModel):
     crew_id: int
     series: str
     message: Optional[str] = None
+    waitlist_position: Optional[int] = None
 
 
 class CrewRequestResponse(BaseModel):
@@ -229,6 +230,7 @@ class CrewRequest(CrewRequestBase):
     id: int
     status: str
     response_message: Optional[str] = None
+    waitlist_position: Optional[int] = None
     created_at: datetime
     responded_at: Optional[datetime] = None
     boat: Optional[Boat] = None

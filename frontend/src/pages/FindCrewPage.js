@@ -21,6 +21,8 @@ import {
   CircularProgress,
   ToggleButtonGroup,
   ToggleButton,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { People, Send, Event as EventIcon, PlaylistAdd } from '@mui/icons-material';
 import { eventsAPI, boatsAPI, crewRequestsAPI, seriesAPI } from '../services/api';
@@ -41,6 +43,8 @@ const FindCrewPage = () => {
   const [selectedCrew, setSelectedCrew] = useState(null);
   const [message, setMessage] = useState('');
   const [requestForSeries, setRequestForSeries] = useState(false);
+  const [addToWaitlist, setAddToWaitlist] = useState(false);
+  const [nextWaitlistPosition, setNextWaitlistPosition] = useState(null);
 
   useEffect(() => {
     loadInitialData();
@@ -97,6 +101,7 @@ const FindCrewPage = () => {
 
     try {
       const eventSeries = getSelectedEventSeries();
+      const waitlistPos = addToWaitlist ? nextWaitlistPosition : null;
       
       if (requestForSeries && eventSeries) {
         const result = await crewRequestsAPI.createForSeries({
@@ -104,21 +109,26 @@ const FindCrewPage = () => {
           crew_id: selectedCrew.crew.id,
           series: eventSeries,
           message,
+          waitlist_position: waitlistPos,
         });
-        setSuccess(`Sent ${result.data.length} requests to ${selectedCrew.crew.name} for ${eventSeries}`);
+        const action = addToWaitlist ? 'Added to waitlist' : 'Sent';
+        setSuccess(`${action} ${result.data.length} requests to ${selectedCrew.crew.name} for ${eventSeries}`);
       } else {
         await crewRequestsAPI.create({
           boat_id: parseInt(selectedBoat),
           crew_id: selectedCrew.crew.id,
           event_id: parseInt(selectedEvent),
           message,
+          waitlist_position: waitlistPos,
         });
-        setSuccess(`Request sent to ${selectedCrew.crew.name}`);
+        const action = addToWaitlist ? 'Added to waitlist' : 'Request sent';
+        setSuccess(`${action}: ${selectedCrew.crew.name}${addToWaitlist ? ` (position #${nextWaitlistPosition})` : ''}`);
       }
       
       setDialogOpen(false);
       setMessage('');
       setRequestForSeries(false);
+      setAddToWaitlist(false);
       loadAvailableCrew();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to send request');
@@ -274,8 +284,21 @@ const FindCrewPage = () => {
                     startIcon={<Send />}
                     fullWidth
                     sx={{ mt: 2 }}
-                    onClick={() => {
+                    onClick={async () => {
                       setSelectedCrew(availability);
+                      setAddToWaitlist(false);
+                      // Fetch next waitlist position
+                      if (selectedBoat && selectedEvent) {
+                        try {
+                          const res = await crewRequestsAPI.getNextWaitlistPosition(
+                            parseInt(selectedBoat),
+                            parseInt(selectedEvent)
+                          );
+                          setNextWaitlistPosition(res.data.next_position);
+                        } catch {
+                          setNextWaitlistPosition(1);
+                        }
+                      }
                       setDialogOpen(true);
                     }}
                     disabled={!selectedBoat}
@@ -333,12 +356,38 @@ const FindCrewPage = () => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Add a personal message..."
+            sx={{ mb: 2 }}
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={addToWaitlist}
+                onChange={(e) => setAddToWaitlist(e.target.checked)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">
+                  Add to waitlist instead of primary request
+                </Typography>
+                {addToWaitlist && nextWaitlistPosition && (
+                  <Typography variant="caption" color="text.secondary">
+                    Will be position #{nextWaitlistPosition} on the waitlist. 
+                    They'll be promoted if preferred crew declines.
+                  </Typography>
+                )}
+              </Box>
+            }
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSendRequest}>
-            {requestForSeries ? 'Send Series Request' : 'Send Request'}
+            {addToWaitlist 
+              ? 'Add to Waitlist' 
+              : (requestForSeries ? 'Send Series Request' : 'Send Request')
+            }
           </Button>
         </DialogActions>
       </Dialog>

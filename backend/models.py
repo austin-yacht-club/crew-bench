@@ -175,6 +175,7 @@ class CrewRequest(Base):
     status = Column(String, default=RequestStatus.PENDING.value)
     message = Column(Text)
     response_message = Column(Text)
+    waitlist_position = Column(Integer, nullable=True)  # null = primary, 1+ = waitlist position
     created_at = Column(DateTime, default=datetime.utcnow)
     responded_at = Column(DateTime)
     

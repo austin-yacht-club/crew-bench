@@ -38,6 +38,7 @@ import {
   PlaylistAddCheck,
   ExitToApp,
   Search,
+  HourglassEmpty,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { crewRequestsAPI } from '../services/api';
@@ -282,7 +283,18 @@ const RequestsPage = () => {
     }
   };
 
-  const statusChip = (status) => {
+  const statusChip = (status, waitlistPosition = null) => {
+    if (waitlistPosition !== null && status === 'pending') {
+      return (
+        <Chip 
+          icon={<HourglassEmpty />} 
+          label={`Waitlist #${waitlistPosition}`} 
+          color="default" 
+          size="small" 
+          variant="outlined"
+        />
+      );
+    }
     const config = {
       pending: { color: 'warning', icon: <Schedule />, label: 'Pending' },
       accepted: { color: 'success', icon: <CheckCircle />, label: 'Accepted' },
@@ -310,7 +322,7 @@ const RequestsPage = () => {
               <Typography variant="h6">{request.crew?.name}</Typography>
             </Box>
           )}
-          {statusChip(request.status)}
+          {statusChip(request.status, request.waitlist_position)}
         </Box>
         <Typography variant="body2" color="text.secondary">
           Event: {request.event?.name}

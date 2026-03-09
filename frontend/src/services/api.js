@@ -88,6 +88,8 @@ export const crewRequestsAPI = {
   respond: (id, status, message) => api.put(`/crew-requests/${id}/respond`, { status, response_message: message }),
   respondToSeries: (series, status, message) => api.put('/crew-requests/series/respond', { series, status, response_message: message }),
   withdraw: (id, reason) => api.put(`/crew-requests/${id}/withdraw`, { reason }),
+  getWaitlist: (boatId, eventId) => api.get(`/crew-requests/waitlist/${boatId}/${eventId}`),
+  getNextWaitlistPosition: (boatId, eventId) => api.get(`/crew-requests/next-waitlist-position/${boatId}/${eventId}`),
 };
 
 export const skipperCommitmentsAPI = {
