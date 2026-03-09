@@ -99,6 +99,7 @@ export const skipperCommitmentsAPI = {
 
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   importCalendar: (url) => api.post('/admin/import-calendar', null, { params: { url } }),
   previewCalendar: (url) => api.get('/admin/calendar-preview', { params: { url } }),
 };

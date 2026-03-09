@@ -39,6 +39,11 @@ class UserUpdate(BaseModel):
     contact_preference: Optional[str] = None
 
 
+class AdminUserUpdate(UserUpdate):
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
 class User(UserBase):
     id: int
     is_active: bool

@@ -867,6 +867,26 @@ def list_all_users(
     return users
 
 
+@app.put("/api/admin/users/{user_id}", response_model=schemas.User)
+def admin_update_user(
+    user_id: int,
+    user_update: schemas.AdminUserUpdate,
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @app.post("/api/admin/import-calendar", response_model=schemas.ImportResult)
 async def import_calendar(
     url: str = Query(default="https://austinyachtclub.net/series-racing-calendar/"),

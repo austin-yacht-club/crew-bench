@@ -26,12 +26,22 @@ import {
   List,
   ListItem,
   ListItemText,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Switch,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Event,
   People,
   CloudDownload,
   Add,
+  Edit,
+  Delete,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { eventsAPI, adminAPI } from '../services/api';
@@ -49,6 +59,7 @@ const AdminPage = () => {
   const [importResult, setImportResult] = useState(null);
   
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({
     name: '',
     description: '',
@@ -58,6 +69,16 @@ const AdminPage = () => {
     event_type: 'race',
     series: '',
     external_url: '',
+  });
+
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userForm, setUserForm] = useState({
+    name: '',
+    role: 'crew',
+    experience_level: 'beginner',
+    is_admin: false,
+    is_active: true,
   });
 
   useEffect(() => {
@@ -98,19 +119,21 @@ const AdminPage = () => {
     }
   };
 
-  const handleCreateEvent = async () => {
-    try {
-      const data = { ...eventForm };
-      if (data.date) data.date = new Date(data.date).toISOString();
-      if (data.end_date) data.end_date = new Date(data.end_date).toISOString();
-      else delete data.end_date;
-      
-      Object.keys(data).forEach(key => {
-        if (data[key] === '') delete data[key];
+  const handleOpenEventDialog = (event = null) => {
+    if (event) {
+      setEditingEvent(event);
+      setEventForm({
+        name: event.name || '',
+        description: event.description || '',
+        date: event.date ? new Date(event.date).toISOString().slice(0, 16) : '',
+        end_date: event.end_date ? new Date(event.end_date).toISOString().slice(0, 16) : '',
+        location: event.location || '',
+        event_type: event.event_type || 'race',
+        series: event.series || '',
+        external_url: event.external_url || '',
       });
-
-      await eventsAPI.create(data);
-      setEventDialogOpen(false);
+    } else {
+      setEditingEvent(null);
       setEventForm({
         name: '',
         description: '',
@@ -121,10 +144,58 @@ const AdminPage = () => {
         series: '',
         external_url: '',
       });
-      setSuccess('Event created successfully');
+    }
+    setEventDialogOpen(true);
+  };
+
+  const handleSaveEvent = async () => {
+    try {
+      const data = { ...eventForm };
+      if (data.date) data.date = new Date(data.date).toISOString();
+      if (data.end_date) data.end_date = new Date(data.end_date).toISOString();
+      else delete data.end_date;
+      
+      Object.keys(data).forEach(key => {
+        if (data[key] === '') delete data[key];
+      });
+
+      if (editingEvent) {
+        await eventsAPI.update(editingEvent.id, data);
+        setSuccess('Event updated successfully');
+      } else {
+        await eventsAPI.create(data);
+        setSuccess('Event created successfully');
+      }
+      
+      setEventDialogOpen(false);
+      setEditingEvent(null);
       loadData();
     } catch (err) {
-      setError('Failed to create event');
+      setError(editingEvent ? 'Failed to update event' : 'Failed to create event');
+    }
+  };
+
+  const handleOpenUserDialog = (user) => {
+    setEditingUser(user);
+    setUserForm({
+      name: user.name || '',
+      role: user.role || 'crew',
+      experience_level: user.experience_level || 'beginner',
+      is_admin: user.is_admin || false,
+      is_active: user.is_active ?? true,
+    });
+    setUserDialogOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      await adminAPI.updateUser(editingUser.id, userForm);
+      setSuccess('User updated successfully');
+      setUserDialogOpen(false);
+      setEditingUser(null);
+      loadData();
+    } catch (err) {
+      setError('Failed to update user');
     }
   };
 
@@ -186,7 +257,7 @@ const AdminPage = () => {
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => setEventDialogOpen(true)}
+              onClick={() => handleOpenEventDialog()}
             >
               Create Event
             </Button>
@@ -223,13 +294,23 @@ const AdminPage = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleDeleteEvent(event.id)}
-                      >
-                        Delete
-                      </Button>
+                      <Tooltip title="Edit">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEventDialog(event)}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteEvent(event.id)}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -335,13 +416,15 @@ const AdminPage = () => {
                 <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
                 <TableCell>Experience</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Admin</TableCell>
                 <TableCell>Joined</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} sx={{ opacity: user.is_active ? 1 : 0.5 }}>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
@@ -349,6 +432,14 @@ const AdminPage = () => {
                   </TableCell>
                   <TableCell>
                     <Chip label={user.experience_level} size="small" variant="outlined" />
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={user.is_active ? 'Active' : 'Inactive'} 
+                      size="small" 
+                      color={user.is_active ? 'success' : 'default'}
+                      variant="outlined"
+                    />
                   </TableCell>
                   <TableCell>
                     {user.is_admin ? (
@@ -360,6 +451,16 @@ const AdminPage = () => {
                   <TableCell>
                     {format(new Date(user.created_at), 'MMM d, yyyy')}
                   </TableCell>
+                  <TableCell>
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenUserDialog(user)}
+                      >
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -368,7 +469,7 @@ const AdminPage = () => {
       )}
 
       <Dialog open={eventDialogOpen} onClose={() => setEventDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create Event</DialogTitle>
+        <DialogTitle>{editingEvent ? 'Edit Event' : 'Create Event'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
@@ -450,10 +551,89 @@ const AdminPage = () => {
           <Button onClick={() => setEventDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            onClick={handleCreateEvent}
+            onClick={handleSaveEvent}
             disabled={!eventForm.name || !eventForm.date}
           >
-            Create Event
+            {editingEvent ? 'Save Changes' : 'Create Event'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Name"
+                value={userForm.name}
+                onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Email: {editingUser?.email}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={userForm.role}
+                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                  label="Role"
+                >
+                  <MenuItem value="crew">Crew</MenuItem>
+                  <MenuItem value="skipper">Skipper</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Experience Level</InputLabel>
+                <Select
+                  value={userForm.experience_level}
+                  onChange={(e) => setUserForm({ ...userForm, experience_level: e.target.value })}
+                  label="Experience Level"
+                >
+                  <MenuItem value="novice">Never Sailed Before</MenuItem>
+                  <MenuItem value="beginner">Beginner</MenuItem>
+                  <MenuItem value="intermediate">Intermediate</MenuItem>
+                  <MenuItem value="advanced">Advanced</MenuItem>
+                  <MenuItem value="expert">Expert</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={userForm.is_admin}
+                    onChange={(e) => setUserForm({ ...userForm, is_admin: e.target.checked })}
+                  />
+                }
+                label="Administrator"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={userForm.is_active}
+                    onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
+                  />
+                }
+                label="Active Account"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveUser}>
+            Save Changes
           </Button>
         </DialogActions>
       </Dialog>
