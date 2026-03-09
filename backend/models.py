@@ -235,3 +235,34 @@ class BoatRating(Base):
     rater = relationship("User")
     boat = relationship("Boat")
     event = relationship("Event")
+
+
+class Notification(Base):
+    """In-app notification for a user."""
+    __tablename__ = "notifications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(String, nullable=False)  # crew_request, request_accepted, request_declined, etc.
+    title = Column(String, nullable=False)
+    body = Column(Text)
+    link = Column(String)  # e.g. /requests, /status
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")
+
+
+class PushSubscription(Base):
+    """Web Push subscription for a user (mobile/desktop)."""
+    __tablename__ = "push_subscriptions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    endpoint = Column(Text, nullable=False)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
+    user_agent = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")

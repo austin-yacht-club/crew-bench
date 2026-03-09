@@ -10,3 +10,4 @@ httpx==0.26.0
 beautifulsoup4==4.12.3
 lxml==5.1.0
 alembic==1.13.1
+pywebpush==1.14.0

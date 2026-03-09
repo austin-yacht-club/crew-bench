@@ -32,6 +32,7 @@ import {
   Person as PersonIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const drawerWidth = 260;
 
@@ -131,6 +132,7 @@ const Layout = () => {
           </Box>
           {user ? (
             <>
+              <NotificationBell />
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
                 <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
                   {user.name?.charAt(0).toUpperCase()}

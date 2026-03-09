@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { AuthProvider, useAuth } from './services/AuthContext';
+import { NotificationsProvider } from './services/NotificationsContext';
 
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -133,6 +134,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
+        <NotificationsProvider>
         <Router>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -161,6 +163,7 @@ function App() {
             </Route>
           </Routes>
         </Router>
+        </NotificationsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

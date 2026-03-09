@@ -9,6 +9,8 @@ A web application for matching sailing crew to boats for racing events.
 - **Crew Availability**: Crew members can mark themselves as available for specific events
 - **Crew Matching**: Skippers can browse available crew and send invitations
 - **Request Management**: Accept or decline crew requests
+- **In-app notifications**: Bell icon with unread count; list, mark read, and open linked pages
+- **Web Push (mobile web)**: Optional push notifications when crew requests are sent or responded to
 - **Admin Interface**: Create events manually or import from racing calendars
 - **Calendar Import**: Import events from external sources like Austin Yacht Club
 
@@ -130,6 +132,7 @@ npm start
 - `SECRET_KEY` - JWT secret key
 - `ADMIN_EMAIL` - Default admin email
 - `ADMIN_PASSWORD` - Default admin password
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Optional. Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
 
 ### Frontend
 - `REACT_APP_API_URL` - Backend API URL

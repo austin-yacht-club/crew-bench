@@ -339,3 +339,34 @@ class BoatRatingSummary(BaseModel):
     boat_id: int
     average_rating: float
     count: int
+
+
+class NotificationBase(BaseModel):
+    kind: str
+    title: str
+    body: Optional[str] = None
+    link: Optional[str] = None
+
+
+class Notification(NotificationBase):
+    id: int
+    user_id: int
+    read_at: Optional[datetime] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: dict  # { p256dh, auth }
+
+
+class PushSubscription(BaseModel):
+    id: int
+    user_id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

@@ -4,6 +4,25 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0] - 2026-03-09
+
+### Added
+
+#### In-app notifications
+- **Notification bell**: Bell icon in the app bar (when logged in) with unread count badge
+- **Notification list**: Dropdown with recent notifications (title, body, relative time); unread styling
+- **Mark read**: Click a notification to mark it read and navigate to its link; "Mark all read" option
+- **Polling**: Unread count refreshes on load and every 60 seconds when the tab is visible
+- **Backend**: Notification model and API (list, unread count, mark read, mark all read); notifications created when crew requests are sent or responded to
+
+#### Web Push (mobile web)
+- **Service worker**: `sw.js` handles push events and shows system notifications (title, body, click opens app to linked page)
+- **Subscribe flow**: "Enable push notifications" in the notification dropdown; requests permission, subscribes with VAPID, saves subscription to backend
+- **Backend**: PushSubscription model and storage; pywebpush sends Web Push when notifications are created (when `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` are set)
+- **Docs**: README updated with notification features and VAPID env vars
+
+---
+
 ## [1.2.0] - 2026-03-09
 
 ### Added

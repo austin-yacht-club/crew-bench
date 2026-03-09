@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from database import engine, get_db, Base
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription
 import schemas
 from auth import (
     get_password_hash,
@@ -59,6 +59,49 @@ async def startup_event():
         db.commit()
         print(f"Created default admin user: {admin_email}")
     db.close()
+
+
+def _create_notification_and_push(
+    db: Session,
+    user_id: int,
+    kind: str,
+    title: str,
+    body: Optional[str] = None,
+    link: Optional[str] = None,
+):
+    """Create in-app notification and send Web Push to user's subscriptions."""
+    notification = Notification(
+        user_id=user_id,
+        kind=kind,
+        title=title,
+        body=body,
+        link=link,
+    )
+    db.add(notification)
+    db.flush()
+    subscriptions = db.query(PushSubscription).filter(PushSubscription.user_id == user_id).all()
+    vapid_private = os.getenv("VAPID_PRIVATE_KEY")
+    if vapid_private and subscriptions:
+        try:
+            import json
+            from pywebpush import webpush, WebPushException
+            payload = json.dumps({"title": title, "body": body or "", "link": link or "/"})
+            for sub in subscriptions:
+                try:
+                    webpush(
+                        subscription_info={
+                            "endpoint": sub.endpoint,
+                            "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                        },
+                        data=payload,
+                        vapid_private_key=vapid_private,
+                        vapid_claims={"sub": "mailto:admin@crewbench.app"},
+                    )
+                except WebPushException:
+                    pass
+        except Exception:
+            pass
+    return notification
 
 
 # Auth Routes
@@ -141,6 +184,104 @@ def change_password(
     current_user.must_change_password = False
     db.commit()
     return {"message": "Password changed successfully"}
+
+
+# Notifications
+@app.get("/api/notifications", response_model=List[schemas.Notification])
+def list_notifications(
+    unread_only: bool = False,
+    limit: int = Query(50, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Notification).filter(Notification.user_id == current_user.id)
+    if unread_only:
+        q = q.filter(Notification.read_at == None)
+    notifications = q.order_by(Notification.created_at.desc()).limit(limit).all()
+    return notifications
+
+
+@app.get("/api/notifications/unread-count")
+def get_unread_count(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    count = db.query(Notification).filter(
+        Notification.user_id == current_user.id,
+        Notification.read_at == None,
+    ).count()
+    return {"count": count}
+
+
+@app.put("/api/notifications/{notification_id}/read", response_model=schemas.Notification)
+def mark_notification_read(
+    notification_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    n = db.query(Notification).filter(
+        Notification.id == notification_id,
+        Notification.user_id == current_user.id,
+    ).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    n.read_at = datetime.utcnow()
+    db.commit()
+    db.refresh(n)
+    return n
+
+
+@app.put("/api/notifications/read-all")
+def mark_all_notifications_read(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    db.query(Notification).filter(
+        Notification.user_id == current_user.id,
+        Notification.read_at == None,
+    ).update({Notification.read_at: datetime.utcnow()})
+    db.commit()
+    return {"message": "All notifications marked as read"}
+
+
+@app.get("/api/push-subscriptions/vapid-public")
+def get_vapid_public_key():
+    """Return the VAPID public key for Web Push subscription (used by frontend)."""
+    key = os.getenv("VAPID_PUBLIC_KEY")
+    if not key:
+        return {"publicKey": None}
+    return {"publicKey": key}
+
+
+@app.post("/api/push-subscriptions", response_model=schemas.PushSubscription)
+def save_push_subscription(
+    data: schemas.PushSubscriptionCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    keys = data.keys
+    if not keys or "p256dh" not in keys or "auth" not in keys:
+        raise HTTPException(status_code=400, detail="Missing p256dh or auth key")
+    existing = db.query(PushSubscription).filter(
+        PushSubscription.user_id == current_user.id,
+        PushSubscription.endpoint == data.endpoint,
+    ).first()
+    if existing:
+        existing.p256dh = keys["p256dh"]
+        existing.auth = keys["auth"]
+        db.commit()
+        db.refresh(existing)
+        return existing
+    sub = PushSubscription(
+        user_id=current_user.id,
+        endpoint=data.endpoint,
+        p256dh=keys["p256dh"],
+        auth=keys["auth"],
+    )
+    db.add(sub)
+    db.commit()
+    db.refresh(sub)
+    return sub
 
 
 # Boat Routes
@@ -643,6 +784,17 @@ def create_crew_request(
     
     db_request = CrewRequest(**request.model_dump())
     db.add(db_request)
+    db.flush()
+    event = db.query(Event).filter(Event.id == request.event_id).first()
+    if event and boat.owner:
+        _create_notification_and_push(
+            db,
+            user_id=request.crew_id,
+            kind="crew_request",
+            title="Crew request",
+            body=f"{current_user.name} invited you to crew on {boat.name} for {event.name}",
+            link="/requests",
+        )
     db.commit()
     db.refresh(db_request)
     return db_request
@@ -727,6 +879,28 @@ def respond_to_request(
             ).order_by(CrewRequest.waitlist_position).all()
             for i, req in enumerate(remaining, start=1):
                 req.waitlist_position = i
+    
+    boat = db.query(Boat).filter(Boat.id == crew_request.boat_id).first()
+    event = db.query(Event).filter(Event.id == crew_request.event_id).first()
+    if boat and boat.owner_id and event:
+        if response.status == RequestStatus.ACCEPTED.value:
+            _create_notification_and_push(
+                db,
+                user_id=boat.owner_id,
+                kind="request_accepted",
+                title="Crew request accepted",
+                body=f"{current_user.name} accepted your invitation to crew on {boat.name} for {event.name}",
+                link="/status",
+            )
+        else:
+            _create_notification_and_push(
+                db,
+                user_id=boat.owner_id,
+                kind="request_declined",
+                title="Crew request declined",
+                body=f"{current_user.name} declined your invitation for {event.name}",
+                link="/requests",
+            )
     
     db.commit()
     db.refresh(crew_request)

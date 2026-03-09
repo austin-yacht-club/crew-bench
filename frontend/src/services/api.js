@@ -113,6 +113,18 @@ export const boatRatingsAPI = {
   getForBoat: (boatId) => api.get(`/boat-ratings/for-boat/${boatId}`),
 };
 
+export const notificationsAPI = {
+  list: (params) => api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+};
+
+export const pushAPI = {
+  getVapidPublicKey: () => api.get('/push-subscriptions/vapid-public'),
+  subscribe: (data) => api.post('/push-subscriptions', data),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
