@@ -38,6 +38,7 @@ const ProfilePage = () => {
     profile_picture: user?.profile_picture || null,
     allow_email_contact: user?.allow_email_contact ?? true,
     allow_phone_contact: user?.allow_phone_contact ?? false,
+    allow_sms_contact: user?.allow_sms_contact ?? false,
     contact_preference: user?.contact_preference || 'email',
   });
   const [loading, setLoading] = useState(false);
@@ -345,8 +346,23 @@ const ProfilePage = () => {
                         }
                         label={
                           formData.phone 
-                            ? "Allow contact via phone" 
-                            : "Allow contact via phone (add phone number first)"
+                            ? "Allow contact via phone call" 
+                            : "Allow contact via phone call (add phone number first)"
+                        }
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.allow_sms_contact}
+                            onChange={handleChange}
+                            name="allow_sms_contact"
+                            disabled={!formData.phone}
+                          />
+                        }
+                        label={
+                          formData.phone 
+                            ? "Allow contact via SMS/text message" 
+                            : "Allow contact via SMS/text message (add phone number first)"
                         }
                       />
                     </FormGroup>
@@ -362,10 +378,13 @@ const ProfilePage = () => {
                       >
                         <MenuItem value="email">Email</MenuItem>
                         <MenuItem value="phone" disabled={!formData.phone}>
-                          Phone {!formData.phone && '(add phone number)'}
+                          Phone call {!formData.phone && '(add phone number)'}
                         </MenuItem>
-                        <MenuItem value="either" disabled={!formData.phone}>
-                          Either {!formData.phone && '(add phone number)'}
+                        <MenuItem value="sms" disabled={!formData.phone}>
+                          SMS/Text {!formData.phone && '(add phone number)'}
+                        </MenuItem>
+                        <MenuItem value="any" disabled={!formData.phone}>
+                          Any method {!formData.phone && '(add phone number)'}
                         </MenuItem>
                       </Select>
                     </FormControl>

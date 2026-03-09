@@ -16,6 +16,7 @@ class UserBase(BaseModel):
     profile_picture: Optional[str] = None
     allow_email_contact: Optional[bool] = True
     allow_phone_contact: Optional[bool] = False
+    allow_sms_contact: Optional[bool] = False
     contact_preference: Optional[str] = "email"
 
 
@@ -34,6 +35,7 @@ class UserUpdate(BaseModel):
     profile_picture: Optional[str] = None
     allow_email_contact: Optional[bool] = None
     allow_phone_contact: Optional[bool] = None
+    allow_sms_contact: Optional[bool] = None
     contact_preference: Optional[str] = None
 
 

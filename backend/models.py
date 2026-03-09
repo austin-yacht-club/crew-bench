@@ -36,7 +36,8 @@ event_boats = Table(
 class ContactPreference(str, enum.Enum):
     EMAIL = "email"
     PHONE = "phone"
-    EITHER = "either"
+    SMS = "sms"
+    ANY = "any"
 
 
 class User(Base):
@@ -55,6 +56,7 @@ class User(Base):
     profile_picture = Column(Text)  # Base64 encoded profile picture
     allow_email_contact = Column(Boolean, default=True)
     allow_phone_contact = Column(Boolean, default=False)
+    allow_sms_contact = Column(Boolean, default=False)
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
