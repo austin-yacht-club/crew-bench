@@ -4,6 +4,48 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-03-09
+
+### Added
+
+#### Admin Enhancements
+- **Edit events**: Edit existing events from the Admin Events tab (name, date, type, series, location, etc.)
+- **Edit users**: Edit users from the Admin Users tab (name, role, experience level, admin flag, active status)
+- **Admin password reset**: Admins can set or reset any user's password and require password change on next login
+
+#### Past Events Filter
+- **Show past events checkbox**: Events and Requests pages hide past events by default; optional checkbox under the search box shows past events
+
+#### Waitlist
+- **Crew request waitlist**: Skippers can add crew to a waitlist (position #1, #2, …) when sending requests
+- **Auto-promotion**: When the primary crew declines, the next person on the waitlist is automatically promoted to pending
+- **Waitlist display**: Requests show "Waitlist #N" status for waitlisted crew
+
+#### Position Preferences
+- **Crew position preferences**: Crew can select preferred positions (Bow, Rail, Trimmer, Pit, Helm, Tactician, Any) on profile and registration
+- **Display**: Position preferences shown as chips on Find Crew cards
+
+#### Ratings
+- **Crew ratings (skipper-viewable)**: Skippers can rate crew (1–5 stars + optional comment) after events; only skippers see crew ratings
+- **Boat ratings (crew-viewable)**: Crew can rate boats (1–5 stars + optional comment); crew and skippers can view boat ratings
+- **Rate from My Schedule**: "Rate" / "Rate boat" buttons on past events in My Schedule open rating dialogs
+- **Find Crew**: Crew cards show star rating and count when viewed by skippers
+
+#### Availability Calendar
+- **Calendar tab**: Events page has a "Calendar" tab with a month view
+- **Month navigation**: Previous/Next month and Today button
+- **Events per day**: Each day lists events; click an event to open Mark Availability
+- **Availability indicators**: Green = available as crew, blue = sailing my boat, gray = not marked
+- **Legend**: Color legend below the calendar
+
+#### Experience Level
+- **Never sailed before**: New "novice" experience level option on registration and profile
+
+### Improved
+- **Profile/Register**: Position preference chips and novice experience level
+
+---
+
 ## [1.1.0] - 2026-03-09
 
 ### Added

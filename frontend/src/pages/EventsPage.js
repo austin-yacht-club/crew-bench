@@ -26,6 +26,8 @@ import {
   AccordionSummary,
   AccordionDetails,
   InputAdornment,
+  IconButton,
+  Paper,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -37,8 +39,24 @@ import {
   PlaylistAddCheck,
   ExpandMore,
   Search,
+  CalendarMonth,
+  ChevronLeft,
+  ChevronRight,
+  Sailing,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  eachDayOfInterval,
+  isToday,
+} from 'date-fns';
 import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI, skipperCommitmentsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 
@@ -62,6 +80,8 @@ const EventsPage = () => {
   const [viewTab, setViewTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
+  const [skipperCommitments, setSkipperCommitments] = useState([]);
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
@@ -105,8 +125,12 @@ const EventsPage = () => {
       setSeriesList(seriesRes.data);
 
       if (user) {
-        const availRes = await availabilityAPI.getMy();
+        const [availRes, commitmentsRes] = await Promise.all([
+          availabilityAPI.getMy(),
+          skipperCommitmentsAPI.getMy(),
+        ]);
         setMyAvailability(availRes.data);
+        setSkipperCommitments(commitmentsRes.data);
       }
     } catch (err) {
       setError('Failed to load events');
@@ -127,6 +151,25 @@ const EventsPage = () => {
     return grouped;
   }, [filteredEvents]);
 
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(calendarMonth);
+    const monthEnd = endOfMonth(calendarMonth);
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  }, [calendarMonth]);
+
+  const eventsByDay = useMemo(() => {
+    const map = {};
+    filteredEvents.forEach((event) => {
+      const d = new Date(event.date);
+      const key = format(d, 'yyyy-MM-dd');
+      if (!map[key]) map[key] = [];
+      map[key].push(event);
+    });
+    return map;
+  }, [filteredEvents]);
+
   const isSeriesFullyAvailable = (seriesName) => {
     const seriesEvents = events.filter((e) => e.series === seriesName);
     return seriesEvents.every((e) => isAvailableFor(e.id));
@@ -134,6 +177,14 @@ const EventsPage = () => {
 
   const isAvailableFor = (eventId) => {
     return myAvailability.some((a) => a.event_id === eventId);
+  };
+
+  const hasSkipperCommitmentForEvent = (eventId) => {
+    return skipperCommitments.some((c) => c.event_id === eventId);
+  };
+
+  const isAvailableOrSkipperForEvent = (eventId) => {
+    return isAvailableFor(eventId) || hasSkipperCommitmentForEvent(eventId);
   };
 
   const getAvailability = (eventId) => {
@@ -430,6 +481,7 @@ const EventsPage = () => {
           >
             <Tab label={`All Events${searchQuery ? ` (${filteredEvents.length})` : ''}`} />
             <Tab label="By Series" />
+            <Tab icon={<CalendarMonth />} label="Calendar" iconPosition="start" />
           </Tabs>
 
           {viewTab === 0 && (
@@ -538,6 +590,134 @@ const EventsPage = () => {
                   </Accordion>
                 );
               })}
+            </Box>
+          )}
+
+          {viewTab === 2 && (
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                  {format(calendarMonth, 'MMMM yyyy')}
+                </Typography>
+                <Box>
+                  <IconButton size="small" onClick={() => setCalendarMonth((m) => subMonths(m, 1))} aria-label="Previous month">
+                    <ChevronLeft />
+                  </IconButton>
+                  <Button size="small" onClick={() => setCalendarMonth(startOfMonth(new Date()))}>
+                    Today
+                  </Button>
+                  <IconButton size="small" onClick={() => setCalendarMonth((m) => addMonths(m, 1))} aria-label="Next month">
+                    <ChevronRight />
+                  </IconButton>
+                </Box>
+              </Box>
+              <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                  }}
+                >
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <Box key={day} sx={{ py: 1, textAlign: 'center', borderRight: 1, borderColor: 'divider', '&:last-of-type': { borderRight: 0 } }}>
+                      <Typography variant="caption" fontWeight={600} color="text.secondary">
+                        {day}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                  }}
+                >
+                  {calendarDays.map((day) => {
+                    const dayKey = format(day, 'yyyy-MM-dd');
+                    const dayEvents = eventsByDay[dayKey] || [];
+                    const inMonth = isSameMonth(day, calendarMonth);
+                    return (
+                      <Box
+                        key={dayKey}
+                        sx={{
+                          minHeight: { xs: 80, sm: 100 },
+                          p: 0.5,
+                          borderRight: 1,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          bgcolor: inMonth ? 'background.paper' : 'action.hover',
+                          '&:nth-of-type(7n)': { borderRight: 0 },
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: isToday(day) ? 700 : 400,
+                            color: isToday(day) ? 'primary.main' : inMonth ? 'text.primary' : 'text.disabled',
+                            mb: 0.5,
+                          }}
+                        >
+                          {format(day, 'd')}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {dayEvents.map((event) => {
+                            const available = isAvailableOrSkipperForEvent(event.id);
+                            const isSkipper = hasSkipperCommitmentForEvent(event.id);
+                            return (
+                              <Button
+                                key={event.id}
+                                size="small"
+                                fullWidth
+                                disableElevation
+                                variant="text"
+                                onClick={() => handleOpenDialog(event)}
+                                sx={{
+                                  justifyContent: 'flex-start',
+                                  textAlign: 'left',
+                                  textTransform: 'none',
+                                  fontSize: '0.7rem',
+                                  py: 0.25,
+                                  px: 0.5,
+                                  minHeight: 'auto',
+                                  bgcolor: available ? (isSkipper ? 'info.light' : 'success.light') : 'grey.200',
+                                  color: available ? (isSkipper ? 'info.dark' : 'success.dark') : 'text.secondary',
+                                  '&:hover': {
+                                    bgcolor: available ? (isSkipper ? 'info.main' : 'success.main') : 'grey.300',
+                                    color: 'white',
+                                  },
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                                  {isSkipper ? <Sailing sx={{ fontSize: 12 }} /> : available ? <CheckCircle sx={{ fontSize: 12 }} /> : null}
+                                  <Typography noWrap variant="caption" component="span">
+                                    {event.name}
+                                  </Typography>
+                                </Box>
+                              </Button>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Paper>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'success.light' }} />
+                  <Typography variant="caption">Available (crew)</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'info.light' }} />
+                  <Typography variant="caption">Sailing my boat</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'grey.200' }} />
+                  <Typography variant="caption">Not marked</Typography>
+                </Box>
+              </Box>
             </Box>
           )}
         </>
