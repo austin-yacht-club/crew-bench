@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from database import engine, get_db, Base
@@ -420,7 +420,11 @@ def get_received_requests(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    requests = db.query(CrewRequest).filter(
+    requests = db.query(CrewRequest).options(
+        joinedload(CrewRequest.boat).joinedload(Boat.owner),
+        joinedload(CrewRequest.event),
+        joinedload(CrewRequest.crew)
+    ).filter(
         CrewRequest.crew_id == current_user.id
     ).order_by(CrewRequest.created_at.desc()).all()
     return requests
@@ -434,7 +438,11 @@ def get_sent_requests(
     boats = db.query(Boat).filter(Boat.owner_id == current_user.id).all()
     boat_ids = [b.id for b in boats]
     
-    requests = db.query(CrewRequest).filter(
+    requests = db.query(CrewRequest).options(
+        joinedload(CrewRequest.boat),
+        joinedload(CrewRequest.event),
+        joinedload(CrewRequest.crew)
+    ).filter(
         CrewRequest.boat_id.in_(boat_ids)
     ).order_by(CrewRequest.created_at.desc()).all()
     return requests

@@ -17,10 +17,110 @@ import {
   DialogActions,
   TextField,
   CircularProgress,
+  Divider,
 } from '@mui/material';
-import { Inbox, Send, CheckCircle, Cancel, Schedule } from '@mui/icons-material';
+import { 
+  Inbox, 
+  Send, 
+  CheckCircle, 
+  Cancel, 
+  Schedule,
+  Email,
+  Phone,
+  Sms,
+} from '@mui/icons-material';
 import { format } from 'date-fns';
 import { crewRequestsAPI } from '../services/api';
+
+const ContactInfo = ({ user, label }) => {
+  if (!user) return null;
+
+  const contactMethods = [];
+  
+  if (user.allow_email_contact && user.email) {
+    contactMethods.push({
+      type: 'email',
+      icon: <Email sx={{ fontSize: 16 }} />,
+      value: user.email,
+      href: `mailto:${user.email}`,
+      preferred: user.contact_preference === 'email',
+    });
+  }
+  
+  if (user.allow_phone_contact && user.phone) {
+    contactMethods.push({
+      type: 'phone',
+      icon: <Phone sx={{ fontSize: 16 }} />,
+      value: user.phone,
+      href: `tel:${user.phone}`,
+      preferred: user.contact_preference === 'phone',
+    });
+  }
+  
+  if (user.allow_sms_contact && user.phone) {
+    contactMethods.push({
+      type: 'sms',
+      icon: <Sms sx={{ fontSize: 16 }} />,
+      value: user.phone,
+      href: `sms:${user.phone}`,
+      preferred: user.contact_preference === 'sms',
+    });
+  }
+
+  if (contactMethods.length === 0) {
+    return (
+      <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          {label} has not shared contact information
+        </Typography>
+      </Box>
+    );
+  }
+
+  const preferredMethod = contactMethods.find(m => m.preferred) || contactMethods[0];
+
+  return (
+    <Box sx={{ mt: 2, p: 2, bgcolor: 'success.50', borderRadius: 1, border: '1px solid', borderColor: 'success.200' }}>
+      <Typography variant="subtitle2" color="success.dark" sx={{ mb: 1 }}>
+        Contact {label}
+      </Typography>
+      {contactMethods.map((method, index) => (
+        <Box 
+          key={method.type + index}
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            mb: 0.5,
+          }}
+        >
+          {method.icon}
+          <Typography 
+            component="a" 
+            href={method.href}
+            variant="body2"
+            sx={{ 
+              color: 'primary.main',
+              textDecoration: 'none',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            {method.value}
+          </Typography>
+          {method.preferred && (
+            <Chip label="Preferred" size="small" color="success" sx={{ height: 20, fontSize: 11 }} />
+          )}
+          <Chip 
+            label={method.type === 'sms' ? 'SMS' : method.type.charAt(0).toUpperCase() + method.type.slice(1)} 
+            size="small" 
+            variant="outlined"
+            sx={{ height: 20, fontSize: 11 }}
+          />
+        </Box>
+      ))}
+    </Box>
+  );
+};
 
 const RequestsPage = () => {
   const [tab, setTab] = useState(0);
@@ -131,6 +231,11 @@ const RequestsPage = () => {
                       <Typography variant="body2" color="text.secondary">
                         Boat: {[request.boat?.make, request.boat?.model].filter(Boolean).join(' ')}
                       </Typography>
+                      {request.boat?.owner && (
+                        <Typography variant="body2" color="text.secondary">
+                          Skipper: {request.boat.owner.name}
+                        </Typography>
+                      )}
                       {request.message && (
                         <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
                           "{request.message}"
@@ -165,6 +270,10 @@ const RequestsPage = () => {
                           Your response: "{request.response_message}"
                         </Typography>
                       )}
+                      
+                      {request.status === 'accepted' && request.boat?.owner && (
+                        <ContactInfo user={request.boat.owner} label="Skipper" />
+                      )}
                     </CardContent>
                   </Card>
                 </Grid>
@@ -194,8 +303,11 @@ const RequestsPage = () => {
                     <CardContent>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}>
-                            {request.crew?.name?.charAt(0).toUpperCase()}
+                          <Avatar 
+                            src={request.crew?.profile_picture || undefined}
+                            sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}
+                          >
+                            {!request.crew?.profile_picture && request.crew?.name?.charAt(0).toUpperCase()}
                           </Avatar>
                           <Typography variant="h6">{request.crew?.name}</Typography>
                         </Box>
@@ -219,6 +331,10 @@ const RequestsPage = () => {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Their response: "{request.response_message}"
                         </Typography>
+                      )}
+                      
+                      {request.status === 'accepted' && request.crew && (
+                        <ContactInfo user={request.crew} label="Crew" />
                       )}
                     </CardContent>
                   </Card>
