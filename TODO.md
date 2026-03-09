@@ -41,6 +41,16 @@ This document tracks planned features, improvements, and known issues.
 - [x] Search filters for events, schedule, and requests
 - [x] Skipper commitments (sailing own boat without crew request)
 
+### v1.2.0 Additions
+- [x] Password change from profile; required admin password change on first login
+- [x] Admin: edit events and users; admin can set/reset user passwords
+- [x] "Show past events" filter (Events and Requests pages)
+- [x] Waitlist for crew requests (auto-promote when primary declines)
+- [x] Position preferences for crew (Bow, Rail, Trimmer, Pit, Helm, Tactician, Any)
+- [x] Crew ratings (skipper-viewable, 1–5 stars); boat ratings (crew-viewable); rate from My Schedule
+- [x] Availability calendar view (month view on Events page with availability indicators)
+- [x] Experience level "Never sailed before" (novice)
+
 ---
 
 ## Planned Features
@@ -60,10 +70,10 @@ This document tracks planned features, improvements, and known issues.
 - [ ] Event check-in on race day
 
 #### Crew Features
-- [ ] Crew ratings/reviews after events
+- [x] Crew ratings/reviews after events (and boat ratings by crew)
 - [ ] Favorite boats (quick access to preferred boats)
-- [ ] Availability calendar view
-- [ ] Position preferences (bow, rail, trimmer, etc.)
+- [x] Availability calendar view
+- [x] Position preferences (bow, rail, trimmer, etc.)
 
 ### Medium Priority
 
@@ -71,7 +81,7 @@ This document tracks planned features, improvements, and known issues.
 - [ ] Crew roster history (who has sailed before)
 - [ ] Quick re-invite previous crew for new events
 - [ ] Crew weight calculator for optimal balance
-- [ ] Waitlist for when preferred crew declines
+- [x] Waitlist for when preferred crew declines
 
 #### Search & Discovery
 - [x] Search/filter events by name, series, location
