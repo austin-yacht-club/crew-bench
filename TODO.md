@@ -39,6 +39,7 @@ This document tracks planned features, improvements, and known issues.
 - [x] Withdrawal from accepted requests
 - [x] Mobile responsive design
 - [x] Search filters for events, schedule, and requests
+- [x] Skipper commitments (sailing own boat without crew request)
 
 ---
 

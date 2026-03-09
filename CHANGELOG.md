@@ -33,6 +33,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Requests search**: Filter incoming/outgoing requests by event, series, boat, or person name
 - **Dynamic counts**: Tab labels update to show filtered result counts
 
+#### Skipper Commitments
+- **Sailing your own boat**: When skippers mark availability for their own boats, they're automatically committed as skipper (no crew request needed)
+- **Separate tracking**: Skipper commitments are tracked separately from crew positions
+- **My Schedule updates**: New "Sailing My Boat" tab shows events where you're sailing your own boat
+- **Summary cards**: Updated to show breakdown of events as crew, sailing own boat, and with crew
+
 ### Improved
 
 #### Calendar Import

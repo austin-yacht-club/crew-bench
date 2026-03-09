@@ -32,9 +32,10 @@ import {
   ExitToApp,
   Close,
   Search,
+  Sailing,
 } from '@mui/icons-material';
 import { format, isFuture, isPast } from 'date-fns';
-import { crewRequestsAPI, boatsAPI } from '../services/api';
+import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 
 const StatusPage = () => {
@@ -43,11 +44,13 @@ const StatusPage = () => {
   const [receivedRequests, setReceivedRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
   const [myBoats, setMyBoats] = useState([]);
+  const [skipperCommitments, setSkipperCommitments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedCommitment, setSelectedCommitment] = useState(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -57,14 +60,16 @@ const StatusPage = () => {
 
   const loadData = async () => {
     try {
-      const [receivedRes, sentRes, boatsRes] = await Promise.all([
+      const [receivedRes, sentRes, boatsRes, commitmentsRes] = await Promise.all([
         crewRequestsAPI.getReceived(),
         crewRequestsAPI.getSent(),
         boatsAPI.listMy(),
+        skipperCommitmentsAPI.getMy(),
       ]);
       setReceivedRequests(receivedRes.data);
       setSentRequests(sentRes.data);
       setMyBoats(boatsRes.data);
+      setSkipperCommitments(commitmentsRes.data);
     } catch (err) {
       setError('Failed to load status data');
     } finally {
@@ -80,15 +85,28 @@ const StatusPage = () => {
 
   const handleWithdraw = async () => {
     try {
-      await crewRequestsAPI.withdraw(selectedRequest.id, withdrawReason);
-      setSuccess('Successfully withdrawn from the event');
+      if (selectedCommitment) {
+        await skipperCommitmentsAPI.cancel(selectedCommitment.id);
+        setSuccess('Skipper commitment cancelled');
+        setSelectedCommitment(null);
+      } else {
+        await crewRequestsAPI.withdraw(selectedRequest.id, withdrawReason);
+        setSuccess('Successfully withdrawn from the event');
+        setSelectedRequest(null);
+      }
       setWithdrawDialogOpen(false);
       setWithdrawReason('');
-      setSelectedRequest(null);
       loadData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to withdraw');
     }
+  };
+
+  const handleOpenCancelCommitment = (commitment) => {
+    setSelectedCommitment(commitment);
+    setSelectedRequest(null);
+    setWithdrawReason('');
+    setWithdrawDialogOpen(true);
   };
 
   const findRequestForCrewEvent = (eventId, boatId) => {
@@ -129,6 +147,16 @@ const StatusPage = () => {
 
   const acceptedReceivedRequests = receivedRequests.filter(r => r.status === 'accepted');
   const acceptedSentRequests = sentRequests.filter(r => r.status === 'accepted');
+
+  const filteredSkipperCommitments = useMemo(() => {
+    if (!searchQuery.trim()) return skipperCommitments;
+    const query = searchQuery.toLowerCase();
+    return skipperCommitments.filter(c =>
+      c.event?.name?.toLowerCase().includes(query) ||
+      c.event?.series?.toLowerCase().includes(query) ||
+      c.boat?.name?.toLowerCase().includes(query)
+    );
+  }, [skipperCommitments, searchQuery]);
 
   const groupByEvent = (requests) => {
     const grouped = {};
@@ -209,41 +237,54 @@ const StatusPage = () => {
       )}
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <Card sx={{ bgcolor: 'success.50' }}>
             <CardContent sx={{ textAlign: 'center' }}>
-              <CheckCircle sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
-              <Typography variant="h4" color="success.main">
-                {acceptedReceivedRequests.length + acceptedSentRequests.length}
+              <CheckCircle sx={{ fontSize: { xs: 32, sm: 40 }, color: 'success.main', mb: 1 }} />
+              <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                {acceptedReceivedRequests.length + acceptedSentRequests.length + skipperCommitments.length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Total Confirmed
+                Total Events
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <DirectionsBoat sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4" color="primary.main">
+              <DirectionsBoat sx={{ fontSize: { xs: 32, sm: 40 }, color: 'primary.main', mb: 1 }} />
+              <Typography variant="h4" color="primary.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                 {crewSchedule.length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Events as Crew
+                As Crew
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <People sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
-              <Typography variant="h4" color="secondary.main">
+              <Sailing sx={{ fontSize: { xs: 32, sm: 40 }, color: 'info.main', mb: 1 }} />
+              <Typography variant="h4" color="info.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                {skipperCommitments.length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sailing Own Boat
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card>
+            <CardContent sx={{ textAlign: 'center' }}>
+              <People sx={{ fontSize: { xs: 32, sm: 40 }, color: 'secondary.main', mb: 1 }} />
+              <Typography variant="h4" color="secondary.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                 {skipperSchedule.length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Events as Skipper
+                With Crew
               </Typography>
             </CardContent>
           </Card>
@@ -280,8 +321,14 @@ const StatusPage = () => {
           iconPosition="start"
         />
         <Tab 
+          icon={<Sailing />} 
+          label={`Sailing My Boat (${filteredSkipperCommitments.length})`}
+          disabled={myBoats.length === 0}
+          iconPosition="start"
+        />
+        <Tab 
           icon={<People />} 
-          label={`As Skipper (${skipperSchedule.length})`}
+          label={`My Crew (${skipperSchedule.length})`}
           disabled={myBoats.length === 0}
           iconPosition="start"
         />
@@ -370,6 +417,84 @@ const StatusPage = () => {
       )}
 
       {tab === 1 && (
+        <>
+          {filteredSkipperCommitments.length === 0 ? (
+            <Card>
+              <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                <Sailing sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="h6">
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No events where you\'re sailing your own boat'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {searchQuery ? 'Try a different search term' : 'Mark yourself available for events with your own boat to add them here'}
+                </Typography>
+              </CardContent>
+            </Card>
+          ) : (
+            <Grid container spacing={3}>
+              {filteredSkipperCommitments
+                .sort((a, b) => new Date(a.event?.date) - new Date(b.event?.date))
+                .map((commitment) => (
+                <Grid item xs={12} md={6} key={commitment.id}>
+                  <Card sx={{ 
+                    borderLeft: 4, 
+                    borderColor: isUpcoming(commitment.event?.date) ? 'primary.main' : 'grey.400',
+                    opacity: isPastEvent(commitment.event?.date) ? 0.7 : 1,
+                  }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box>
+                          <Typography variant="h6" gutterBottom>
+                            {commitment.event?.name}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <EventIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="text.secondary">
+                              {commitment.event?.date && format(new Date(commitment.event.date), 'EEEE, MMMM d, yyyy')}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <DirectionsBoat fontSize="small" color="action" />
+                            <Typography variant="body2" color="text.secondary">
+                              {commitment.boat?.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip 
+                            label="Skipper" 
+                            color="primary" 
+                            size="small" 
+                            icon={<Sailing />}
+                          />
+                          {isUpcoming(commitment.event?.date) && (
+                            <Tooltip title="Cancel commitment">
+                              <IconButton 
+                                size="small" 
+                                color="error"
+                                onClick={() => handleOpenCancelCommitment(commitment)}
+                              >
+                                <Close fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Box>
+                      {commitment.notes && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          Note: {commitment.notes}
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </>
+      )}
+
+      {tab === 2 && (
         <>
           {skipperSchedule.length === 0 ? (
             <Card>
@@ -507,26 +632,41 @@ const StatusPage = () => {
       )}
 
       <Dialog open={withdrawDialogOpen} onClose={() => setWithdrawDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Withdraw from Event</DialogTitle>
+        <DialogTitle>
+          {selectedCommitment ? 'Cancel Skipper Commitment' : 'Withdraw from Event'}
+        </DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Are you sure you want to withdraw? This will cancel the confirmed crew position.
+            {selectedCommitment 
+              ? 'Are you sure you want to cancel? You will no longer be listed as sailing your own boat for this event.'
+              : 'Are you sure you want to withdraw? This will cancel the confirmed crew position.'
+            }
           </Alert>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            <strong>Event:</strong> {selectedRequest?.event?.name}<br />
-            <strong>Date:</strong> {selectedRequest?.event?.date && format(new Date(selectedRequest.event.date), 'MMMM d, yyyy')}<br />
-            <strong>Boat:</strong> {selectedRequest?.boat?.name}<br />
-            <strong>Crew:</strong> {selectedRequest?.crew?.name}
-          </Typography>
-          <TextField
-            fullWidth
-            label="Reason for withdrawal (optional)"
-            multiline
-            rows={3}
-            value={withdrawReason}
-            onChange={(e) => setWithdrawReason(e.target.value)}
-            placeholder="Let them know why you're withdrawing..."
-          />
+          {selectedCommitment ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <strong>Event:</strong> {selectedCommitment?.event?.name}<br />
+              <strong>Date:</strong> {selectedCommitment?.event?.date && format(new Date(selectedCommitment.event.date), 'MMMM d, yyyy')}<br />
+              <strong>Boat:</strong> {selectedCommitment?.boat?.name}
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                <strong>Event:</strong> {selectedRequest?.event?.name}<br />
+                <strong>Date:</strong> {selectedRequest?.event?.date && format(new Date(selectedRequest.event.date), 'MMMM d, yyyy')}<br />
+                <strong>Boat:</strong> {selectedRequest?.boat?.name}<br />
+                <strong>Crew:</strong> {selectedRequest?.crew?.name}
+              </Typography>
+              <TextField
+                fullWidth
+                label="Reason for withdrawal (optional)"
+                multiline
+                rows={3}
+                value={withdrawReason}
+                onChange={(e) => setWithdrawReason(e.target.value)}
+                placeholder="Let them know why you're withdrawing..."
+              />
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
@@ -535,7 +675,7 @@ const StatusPage = () => {
             color="warning"
             onClick={handleWithdraw}
           >
-            Confirm Withdrawal
+            {selectedCommitment ? 'Confirm Cancellation' : 'Confirm Withdrawal'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -179,3 +179,19 @@ class CrewRequest(Base):
     boat = relationship("Boat", back_populates="crew_requests")
     crew = relationship("User", back_populates="crew_requests")
     event = relationship("Event")
+
+
+class SkipperCommitment(Base):
+    __tablename__ = "skipper_commitments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    skipper_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    boat_id = Column(Integer, ForeignKey("boats.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    notes = Column(Text)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    skipper = relationship("User")
+    boat = relationship("Boat")
+    event = relationship("Event")

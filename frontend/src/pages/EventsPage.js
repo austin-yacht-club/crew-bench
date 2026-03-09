@@ -38,7 +38,7 @@ import {
   Search,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI } from '../services/api';
+import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI, skipperCommitmentsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 
 const EventsPage = () => {
@@ -158,31 +158,78 @@ const EventsPage = () => {
 
   const handleMarkAvailable = async () => {
     try {
-      const baseData = {
-        availability_type: availabilityType,
-        notes: availabilityNotes || null,
-      };
-
+      const myBoatIds = boats.filter(b => b.owner_id === user?.id).map(b => b.id);
+      
       if (availabilityType === 'boats' && selectedBoats.length > 0) {
-        baseData.boat_ids = selectedBoats.map(b => b.id);
-      }
-
-      if (availabilityType === 'fleets' && selectedFleets.length > 0) {
-        baseData.fleet_ids = selectedFleets.map(f => f.id);
-      }
-
-      if (selectedSeries) {
-        const result = await availabilityAPI.markSeriesAvailable({
-          ...baseData,
-          series: selectedSeries,
-        });
-        setSuccess(`Marked available for ${result.data.length} events in ${selectedSeries}`);
+        const ownBoats = selectedBoats.filter(b => myBoatIds.includes(b.id));
+        const otherBoats = selectedBoats.filter(b => !myBoatIds.includes(b.id));
+        
+        const results = [];
+        
+        if (ownBoats.length > 0) {
+          for (const boat of ownBoats) {
+            if (selectedSeries) {
+              await skipperCommitmentsAPI.createForSeries({
+                boat_id: boat.id,
+                series: selectedSeries,
+                notes: availabilityNotes || null,
+              });
+            } else {
+              await skipperCommitmentsAPI.create({
+                boat_id: boat.id,
+                event_id: selectedEvent.id,
+                notes: availabilityNotes || null,
+              });
+            }
+          }
+          results.push(`Committed to sail ${ownBoats.length} of your own boat(s)`);
+        }
+        
+        if (otherBoats.length > 0) {
+          const baseData = {
+            availability_type: 'boats',
+            notes: availabilityNotes || null,
+            boat_ids: otherBoats.map(b => b.id),
+          };
+          
+          if (selectedSeries) {
+            await availabilityAPI.markSeriesAvailable({
+              ...baseData,
+              series: selectedSeries,
+            });
+          } else {
+            await availabilityAPI.markAvailable({
+              ...baseData,
+              event_id: selectedEvent.id,
+            });
+          }
+          results.push(`Marked available as crew for ${otherBoats.length} other boat(s)`);
+        }
+        
+        setSuccess(results.join(' and '));
       } else {
-        await availabilityAPI.markAvailable({
-          ...baseData,
-          event_id: selectedEvent.id,
-        });
-        setSuccess('Marked as available');
+        const baseData = {
+          availability_type: availabilityType,
+          notes: availabilityNotes || null,
+        };
+
+        if (availabilityType === 'fleets' && selectedFleets.length > 0) {
+          baseData.fleet_ids = selectedFleets.map(f => f.id);
+        }
+
+        if (selectedSeries) {
+          const result = await availabilityAPI.markSeriesAvailable({
+            ...baseData,
+            series: selectedSeries,
+          });
+          setSuccess(`Marked available for ${result.data.length} events in ${selectedSeries}`);
+        } else {
+          await availabilityAPI.markAvailable({
+            ...baseData,
+            event_id: selectedEvent.id,
+          });
+          setSuccess('Marked as available');
+        }
       }
 
       setDialogOpen(false);

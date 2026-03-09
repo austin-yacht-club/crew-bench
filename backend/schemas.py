@@ -240,3 +240,32 @@ class ImportResult(BaseModel):
     skipped_count: int = 0
     events: List[Event]
     errors: List[str] = []
+
+
+class SkipperCommitmentBase(BaseModel):
+    boat_id: int
+    event_id: int
+    notes: Optional[str] = None
+
+
+class SkipperCommitmentCreate(SkipperCommitmentBase):
+    pass
+
+
+class SkipperCommitmentSeriesCreate(BaseModel):
+    boat_id: int
+    series: str
+    notes: Optional[str] = None
+
+
+class SkipperCommitment(SkipperCommitmentBase):
+    id: int
+    skipper_id: int
+    is_active: bool
+    created_at: datetime
+    skipper: Optional[User] = None
+    boat: Optional[Boat] = None
+    event: Optional[Event] = None
+    
+    class Config:
+        from_attributes = True

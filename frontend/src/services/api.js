@@ -88,6 +88,13 @@ export const crewRequestsAPI = {
   withdraw: (id, reason) => api.put(`/crew-requests/${id}/withdraw`, { reason }),
 };
 
+export const skipperCommitmentsAPI = {
+  create: (data) => api.post('/skipper-commitments', data),
+  createForSeries: (data) => api.post('/skipper-commitments/series', data),
+  getMy: () => api.get('/skipper-commitments/my'),
+  cancel: (id) => api.delete(`/skipper-commitments/${id}`),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   importCalendar: (url) => api.post('/admin/import-calendar', null, { params: { url } }),

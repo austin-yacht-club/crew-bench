@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from database import engine, get_db, Base
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment
 import schemas
 from auth import (
     get_password_hash, 
@@ -468,6 +468,130 @@ def get_series_events(
         Event.is_active == True
     ).order_by(Event.date).all()
     return events
+
+
+# Skipper Commitment Routes
+@app.post("/api/skipper-commitments", response_model=schemas.SkipperCommitment)
+def create_skipper_commitment(
+    commitment: schemas.SkipperCommitmentCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Commit to sailing your own boat for an event (no crew request needed)."""
+    boat = db.query(Boat).filter(Boat.id == commitment.boat_id).first()
+    if not boat:
+        raise HTTPException(status_code=404, detail="Boat not found")
+    if boat.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only commit to sailing your own boats")
+    
+    event = db.query(Event).filter(Event.id == commitment.event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    existing = db.query(SkipperCommitment).filter(
+        SkipperCommitment.skipper_id == current_user.id,
+        SkipperCommitment.boat_id == commitment.boat_id,
+        SkipperCommitment.event_id == commitment.event_id,
+        SkipperCommitment.is_active == True
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Already committed to this event with this boat")
+    
+    db_commitment = SkipperCommitment(
+        skipper_id=current_user.id,
+        boat_id=commitment.boat_id,
+        event_id=commitment.event_id,
+        notes=commitment.notes
+    )
+    db.add(db_commitment)
+    db.commit()
+    db.refresh(db_commitment)
+    return db_commitment
+
+
+@app.post("/api/skipper-commitments/series", response_model=List[schemas.SkipperCommitment])
+def create_skipper_commitment_for_series(
+    commitment: schemas.SkipperCommitmentSeriesCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Commit to sailing your own boat for all events in a series."""
+    boat = db.query(Boat).filter(Boat.id == commitment.boat_id).first()
+    if not boat:
+        raise HTTPException(status_code=404, detail="Boat not found")
+    if boat.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only commit to sailing your own boats")
+    
+    events = db.query(Event).filter(
+        Event.series == commitment.series,
+        Event.is_active == True,
+        Event.date >= datetime.utcnow()
+    ).all()
+    
+    if not events:
+        raise HTTPException(status_code=404, detail="No upcoming events found in this series")
+    
+    created = []
+    for event in events:
+        existing = db.query(SkipperCommitment).filter(
+            SkipperCommitment.skipper_id == current_user.id,
+            SkipperCommitment.boat_id == commitment.boat_id,
+            SkipperCommitment.event_id == event.id,
+            SkipperCommitment.is_active == True
+        ).first()
+        
+        if not existing:
+            db_commitment = SkipperCommitment(
+                skipper_id=current_user.id,
+                boat_id=commitment.boat_id,
+                event_id=event.id,
+                notes=commitment.notes
+            )
+            db.add(db_commitment)
+            created.append(db_commitment)
+    
+    db.commit()
+    for c in created:
+        db.refresh(c)
+    return created
+
+
+@app.get("/api/skipper-commitments/my", response_model=List[schemas.SkipperCommitment])
+def get_my_skipper_commitments(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all skipper commitments for the current user."""
+    commitments = db.query(SkipperCommitment).options(
+        joinedload(SkipperCommitment.boat),
+        joinedload(SkipperCommitment.event)
+    ).filter(
+        SkipperCommitment.skipper_id == current_user.id,
+        SkipperCommitment.is_active == True
+    ).all()
+    return commitments
+
+
+@app.delete("/api/skipper-commitments/{commitment_id}")
+def cancel_skipper_commitment(
+    commitment_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel a skipper commitment."""
+    commitment = db.query(SkipperCommitment).filter(
+        SkipperCommitment.id == commitment_id
+    ).first()
+    
+    if not commitment:
+        raise HTTPException(status_code=404, detail="Commitment not found")
+    if commitment.skipper_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    commitment.is_active = False
+    db.commit()
+    return {"message": "Commitment cancelled"}
 
 
 # Crew Request Routes
