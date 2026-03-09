@@ -42,6 +42,8 @@ class UserUpdate(BaseModel):
 class AdminUserUpdate(UserUpdate):
     is_admin: Optional[bool] = None
     is_active: Optional[bool] = None
+    new_password: Optional[str] = None
+    must_change_password: Optional[bool] = None
 
 
 class User(UserBase):

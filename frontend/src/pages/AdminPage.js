@@ -79,6 +79,8 @@ const AdminPage = () => {
     experience_level: 'beginner',
     is_admin: false,
     is_active: true,
+    new_password: '',
+    must_change_password: false,
   });
 
   useEffect(() => {
@@ -183,19 +185,27 @@ const AdminPage = () => {
       experience_level: user.experience_level || 'beginner',
       is_admin: user.is_admin || false,
       is_active: user.is_active ?? true,
+      new_password: '',
+      must_change_password: false,
     });
     setUserDialogOpen(true);
   };
 
   const handleSaveUser = async () => {
     try {
-      await adminAPI.updateUser(editingUser.id, userForm);
+      const data = { ...userForm };
+      // Only include password if it's set
+      if (!data.new_password) {
+        delete data.new_password;
+        delete data.must_change_password;
+      }
+      await adminAPI.updateUser(editingUser.id, data);
       setSuccess('User updated successfully');
       setUserDialogOpen(false);
       setEditingUser(null);
       loadData();
     } catch (err) {
-      setError('Failed to update user');
+      setError(err.response?.data?.detail || 'Failed to update user');
     }
   };
 
@@ -628,11 +638,42 @@ const AdminPage = () => {
                 label="Active Account"
               />
             </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                Reset Password (optional)
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                type="password"
+                label="New Password"
+                value={userForm.new_password}
+                onChange={(e) => setUserForm({ ...userForm, new_password: e.target.value })}
+                helperText="Leave blank to keep current password. Min 8 characters."
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={userForm.must_change_password}
+                    onChange={(e) => setUserForm({ ...userForm, must_change_password: e.target.checked })}
+                    disabled={!userForm.new_password}
+                  />
+                }
+                label="Require password change on login"
+              />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveUser}>
+          <Button 
+            variant="contained" 
+            onClick={handleSaveUser}
+            disabled={userForm.new_password && userForm.new_password.length < 8}
+          >
             Save Changes
           </Button>
         </DialogActions>

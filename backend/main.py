@@ -879,6 +879,15 @@ def admin_update_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     update_data = user_update.model_dump(exclude_unset=True)
+    
+    # Handle password separately - hash it before saving
+    if 'new_password' in update_data:
+        new_password = update_data.pop('new_password')
+        if new_password:
+            if len(new_password) < 8:
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+            user.hashed_password = get_password_hash(new_password)
+    
     for field, value in update_data.items():
         setattr(user, field, value)
     
