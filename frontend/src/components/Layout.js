@@ -27,6 +27,7 @@ import {
   DirectionsBoat as BoatIcon,
   People as PeopleIcon,
   Inbox as InboxIcon,
+  CalendarMonth as CalendarIcon,
   AdminPanelSettings as AdminIcon,
   Person as PersonIcon,
 } from '@mui/icons-material';
@@ -50,6 +51,7 @@ const Layout = () => {
   const menuItems = [
     { text: 'Events', icon: <EventIcon />, path: '/events' },
     ...(user ? [
+      { text: 'My Schedule', icon: <CalendarIcon />, path: '/status' },
       { text: 'My Boats', icon: <BoatIcon />, path: '/boats' },
       { text: 'Find Crew', icon: <PeopleIcon />, path: '/find-crew' },
       { text: 'Requests', icon: <InboxIcon />, path: '/requests' },

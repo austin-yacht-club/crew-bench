@@ -12,6 +12,7 @@ import BoatsPage from './pages/BoatsPage';
 import ProfilePage from './pages/ProfilePage';
 import FindCrewPage from './pages/FindCrewPage';
 import RequestsPage from './pages/RequestsPage';
+import StatusPage from './pages/StatusPage';
 import AdminPage from './pages/AdminPage';
 
 const theme = createTheme({
@@ -102,6 +103,9 @@ function App() {
               } />
               <Route path="requests" element={
                 <PrivateRoute><RequestsPage /></PrivateRoute>
+              } />
+              <Route path="status" element={
+                <PrivateRoute><StatusPage /></PrivateRoute>
               } />
               <Route path="profile" element={
                 <PrivateRoute><ProfilePage /></PrivateRoute>
