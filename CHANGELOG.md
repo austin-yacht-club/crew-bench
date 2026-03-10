@@ -42,6 +42,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **scripts/verify_sailing_my_boat.sh**: Seeds an event, boat, and skipper commitment via API and prints steps to verify “Sailing my boat” in the UI
 
+#### Contacts
+- **Contacts page**: List users connected via crew requests (sent or received); view full profile (bio, contact when allowed) in a dialog
+- **Backend**: `GET /api/contacts` and `GET /api/contacts/{user_id}` (only for connected users)
+- **View profile from Schedule and Requests**: Click skipper or crew name/avatar in My Schedule or Requests to open the same profile dialog
+- **ContactProfileDialog**: Shared component used by Contacts, Status, and Requests pages
+
+### Fixed
+
+- **Requests (Received)**: Single request no longer appears twice when there are no series (removed duplicate "All Invitations" render)
+
+### Improved
+
+- **Profile pictures in thumbnails**: App bar avatar (upper right) and Find Crew crew cards show user profile picture when set; initial letter fallback when not
+
 ---
 
 ## [1.5.0] - 2026-03-09

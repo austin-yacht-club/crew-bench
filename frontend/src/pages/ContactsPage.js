@@ -10,15 +10,10 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Divider,
 } from '@mui/material';
-import { People, Person, Email, Phone, Close } from '@mui/icons-material';
+import { People } from '@mui/icons-material';
 import { contactsAPI } from '../services/api';
+import ContactProfileDialog from '../components/ContactProfileDialog';
 
 const EXPERIENCE_LABELS = {
   novice: 'Never sailed before',
@@ -28,15 +23,11 @@ const EXPERIENCE_LABELS = {
   expert: 'Expert',
 };
 
-const POSITION_OPTIONS = ['Bow', 'Rail', 'Trimmer', 'Pit', 'Helm', 'Tactician', 'Any'];
-
 const ContactsPage = () => {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedContact, setSelectedContact] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profile, setProfile] = useState(null);
+  const [profileUserId, setProfileUserId] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -52,24 +43,8 @@ const ContactsPage = () => {
     load();
   }, []);
 
-  const handleOpenProfile = async (contact) => {
-    setSelectedContact(contact);
-    setProfile(null);
-    setProfileLoading(true);
-    try {
-      const res = await contactsAPI.get(contact.id);
-      setProfile(res.data);
-    } catch (err) {
-      setProfile(null);
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  const handleCloseProfile = () => {
-    setSelectedContact(null);
-    setProfile(null);
-  };
+  const handleOpenProfile = (contact) => setProfileUserId(contact.id);
+  const handleCloseProfile = () => setProfileUserId(null);
 
   if (loading) {
     return (
@@ -141,108 +116,11 @@ const ContactsPage = () => {
         </Grid>
       )}
 
-      <Dialog open={Boolean(selectedContact)} onClose={handleCloseProfile} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>Profile</span>
-          <Button startIcon={<Close />} onClick={handleCloseProfile} size="small">
-            Close
-          </Button>
-        </DialogTitle>
-        <DialogContent dividers>
-          {profileLoading && (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
-            </Box>
-          )}
-          {profile && !profileLoading && (
-            <Box>
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Avatar
-                  src={profile.profile_picture || undefined}
-                  sx={{ width: 80, height: 80, mx: 'auto', mb: 1, bgcolor: 'primary.main' }}
-                >
-                  {!profile.profile_picture && profile.name?.charAt(0).toUpperCase()}
-                </Avatar>
-                <Typography variant="h6">{profile.name}</Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                  <Chip label={profile.role || 'crew'} color="primary" size="small" />
-                  <Chip
-                    label={EXPERIENCE_LABELS[profile.experience_level] || profile.experience_level || '—'}
-                    variant="outlined"
-                    size="small"
-                  />
-                </Box>
-              </Box>
-              <Divider sx={{ my: 2 }} />
-              {profile.bio && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Bio
-                  </Typography>
-                  <Typography variant="body2">{profile.bio}</Typography>
-                </Box>
-              )}
-              {(profile.weight || profile.certifications) && (
-                <Box sx={{ mb: 2 }}>
-                  {profile.weight != null && (
-                    <Typography variant="body2">
-                      <strong>Weight:</strong> {profile.weight} lbs
-                    </Typography>
-                  )}
-                  {profile.certifications && (
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                      <strong>Certifications:</strong> {profile.certifications}
-                    </Typography>
-                  )}
-                </Box>
-              )}
-              {profile.position_preferences && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Position preferences
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {profile.position_preferences.split(',').map((p) => (
-                      <Chip key={p} label={p.trim()} size="small" variant="outlined" />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Contact
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {profile.allow_email_contact && profile.email && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Email fontSize="small" color="action" />
-                    <Typography variant="body2" component="a" href={`mailto:${profile.email}`}>
-                      {profile.email}
-                    </Typography>
-                  </Box>
-                )}
-                {(profile.allow_phone_contact || profile.allow_sms_contact) && profile.phone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Phone fontSize="small" color="action" />
-                    <Typography variant="body2" component="a" href={`tel:${profile.phone}`}>
-                      {profile.phone}
-                    </Typography>
-                  </Box>
-                )}
-                {!(profile.allow_email_contact && profile.email) &&
-                  !((profile.allow_phone_contact || profile.allow_sms_contact) && profile.phone) && (
-                    <Typography variant="body2" color="text.secondary">
-                      No contact details shared
-                    </Typography>
-                  )}
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseProfile}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      <ContactProfileDialog
+        open={Boolean(profileUserId)}
+        onClose={handleCloseProfile}
+        userId={profileUserId}
+      />
     </Box>
   );
 };

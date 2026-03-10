@@ -269,8 +269,11 @@ const FindCrewPage = () => {
               <Card>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                      {availability.crew?.name?.charAt(0).toUpperCase()}
+                    <Avatar
+                      src={availability.crew?.profile_picture || undefined}
+                      sx={{ bgcolor: 'primary.main', mr: 2 }}
+                    >
+                      {!availability.crew?.profile_picture && availability.crew?.name?.charAt(0).toUpperCase()}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6">{availability.crew?.name}</Typography>

@@ -38,6 +38,7 @@ import { format, isFuture, isPast } from 'date-fns';
 import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI, boatRatingsAPI, crewRatingsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 import StarRating from '../components/StarRating';
+import ContactProfileDialog from '../components/ContactProfileDialog';
 
 const StatusPage = () => {
   const { user } = useAuth();
@@ -61,6 +62,7 @@ const StatusPage = () => {
   const [rateTarget, setRateTarget] = useState(null);
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
+  const [profileUserId, setProfileUserId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -502,7 +504,18 @@ const StatusPage = () => {
                           </Box>
                           <Typography variant="body2" color="text.secondary" sx={{ ml: 3.5 }}>
                             {[request.boat?.make, request.boat?.model].filter(Boolean).join(' ')}
-                            {request.boat?.owner && ` • Skipper: ${request.boat.owner.name}`}
+                            {request.boat?.owner && (
+                              <>
+                                {' • Skipper: '}
+                                <Button
+                                  size="small"
+                                  sx={{ p: 0, minWidth: 'auto', textTransform: 'none', verticalAlign: 'baseline' }}
+                                  onClick={(e) => { e.stopPropagation(); setProfileUserId(request.boat.owner.id); }}
+                                >
+                                  {request.boat.owner.name}
+                                </Button>
+                              </>
+                            )}
                           </Typography>
                         </Box>
                       ))}
@@ -654,10 +667,13 @@ const StatusPage = () => {
                           </Typography>
                           <AvatarGroup max={5} sx={{ justifyContent: 'flex-start' }}>
                             {crew.map(member => (
-                              <Tooltip key={member.id} title={member.name}>
-                                <Avatar 
+                              <Tooltip key={member.id} title={`${member.name} (view profile)`}>
+                                <Avatar
+                                  component="button"
+                                  type="button"
+                                  onClick={() => setProfileUserId(member.id)}
                                   src={member.profile_picture || undefined}
-                                  sx={{ width: 36, height: 36 }}
+                                  sx={{ width: 36, height: 36, cursor: 'pointer', border: '2px solid white' }}
                                 >
                                   {!member.profile_picture && member.name?.charAt(0).toUpperCase()}
                                 </Avatar>
@@ -687,13 +703,22 @@ const StatusPage = () => {
                           const request = findRequestForSkipperEvent(event.id, member.id);
                           return (
                             <Box key={member.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Avatar 
+                              <Avatar
+                                component="button"
+                                type="button"
+                                onClick={() => setProfileUserId(member.id)}
                                 src={member.profile_picture || undefined}
-                                sx={{ width: 24, height: 24, fontSize: 12 }}
+                                sx={{ width: 24, height: 24, fontSize: 12, cursor: 'pointer' }}
                               >
                                 {!member.profile_picture && member.name?.charAt(0).toUpperCase()}
                               </Avatar>
-                              <Typography variant="body2">{member.name}</Typography>
+                              <Button
+                                size="small"
+                                sx={{ p: 0, minWidth: 'auto', textTransform: 'none', color: 'text.primary' }}
+                                onClick={() => setProfileUserId(member.id)}
+                              >
+                                {member.name}
+                              </Button>
                               <Chip 
                                 label={member.experience_level || 'beginner'} 
                                 size="small" 
@@ -854,6 +879,12 @@ const StatusPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ContactProfileDialog
+        open={Boolean(profileUserId)}
+        onClose={() => setProfileUserId(null)}
+        userId={profileUserId}
+      />
     </Box>
   );
 };

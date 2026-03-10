@@ -136,8 +136,11 @@ const Layout = () => {
             <>
               <NotificationBell />
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-                <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
-                  {user.name?.charAt(0).toUpperCase()}
+                <Avatar
+                  src={user.profile_picture || undefined}
+                  sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}
+                >
+                  {!user.profile_picture && user.name?.charAt(0).toUpperCase()}
                 </Avatar>
               </IconButton>
               <Menu

@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { crewRequestsAPI } from '../services/api';
+import ContactProfileDialog from '../components/ContactProfileDialog';
 
 const ContactInfo = ({ user, label }) => {
   if (!user) return null;
@@ -148,6 +149,7 @@ const RequestsPage = () => {
   const [withdrawReason, setWithdrawReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [profileUserId, setProfileUserId] = useState(null);
 
   const filteredReceivedRequests = useMemo(() => {
     let filtered = receivedRequests;
@@ -312,8 +314,13 @@ const RequestsPage = () => {
           {isReceived ? (
             <Typography variant="h6">{request.boat?.name}</Typography>
           ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Avatar 
+            <Box
+              component="button"
+              type="button"
+              onClick={() => request.crew?.id && setProfileUserId(request.crew.id)}
+              sx={{ display: 'flex', alignItems: 'center', border: 'none', background: 'none', cursor: request.crew?.id ? 'pointer' : 'default', p: 0, textAlign: 'left' }}
+            >
+              <Avatar
                 src={request.crew?.profile_picture || undefined}
                 sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}
               >
@@ -337,7 +344,14 @@ const RequestsPage = () => {
         </Typography>
         {isReceived && request.boat?.owner && (
           <Typography variant="body2" color="text.secondary">
-            Skipper: {request.boat.owner.name}
+            Skipper:{' '}
+            <Button
+              size="small"
+              sx={{ p: 0, minWidth: 'auto', textTransform: 'none', verticalAlign: 'baseline' }}
+              onClick={() => setProfileUserId(request.boat.owner.id)}
+            >
+              {request.boat.owner.name}
+            </Button>
           </Typography>
         )}
         {request.message && (
@@ -546,14 +560,10 @@ const RequestsPage = () => {
                 {Object.keys(receivedBySeries).length > 0 ? 'Individual Invitations' : 'All Invitations'}
               </Typography>
               <Grid container spacing={3}>
-                {filteredReceivedRequests
-                  .filter(r => !r.event?.series)
-                  .map((request) => (
-                    <Grid item xs={12} md={6} key={request.id}>
-                      {renderRequestCard(request, true)}
-                    </Grid>
-                  ))}
-                {Object.keys(receivedBySeries).length === 0 && receivedRequests.map((request) => (
+                {(Object.keys(receivedBySeries).length > 0
+                  ? filteredReceivedRequests.filter(r => !r.event?.series)
+                  : filteredReceivedRequests
+                ).map((request) => (
                   <Grid item xs={12} md={6} key={request.id}>
                     {renderRequestCard(request, true)}
                   </Grid>
@@ -669,6 +679,12 @@ const RequestsPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ContactProfileDialog
+        open={Boolean(profileUserId)}
+        onClose={() => setProfileUserId(null)}
+        userId={profileUserId}
+      />
     </Box>
   );
 };

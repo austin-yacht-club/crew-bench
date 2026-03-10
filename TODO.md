@@ -68,6 +68,8 @@ This document tracks planned features, improvements, and known issues.
 - [x] Frontend relative API URL (empty REACT_APP_API_URL = same-origin `/api`); dev proxy in package.json
 - [x] Sanity tests for proxy deployment (pytest + script); README docs for Cloudflare Zero Trust
 - [x] Production frontend Docker image (nginx serves React build, proxies `/api` to backend; `/api/api` support for proxies that strip one `/api`)
+- [x] Contacts: view users connected via crew requests; view their profile; view profile from My Schedule and Requests (shared ContactProfileDialog)
+- [x] Profile picture in app bar and Find Crew thumbnails; fix duplicate received request when no series
 
 ---
 
