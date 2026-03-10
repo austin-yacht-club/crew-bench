@@ -93,6 +93,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API path segments (no leading slash) - when proxy strips ROOT_PATH we rewrite so routes match
+_API_PATH_PREFIXES = (
+    "auth/", "auth", "docs", "openapi.json", "redoc", "health",
+    "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
+    "availability", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
+    "admin/", "admin", "favorite-boats",
+)
+
+
+class RootPathRewriteMiddleware(BaseHTTPMiddleware):
+    """When ROOT_PATH is set (e.g. /api) and the request path doesn't include it, rewrite so routes match.
+    Handles proxies (e.g. Cloudflare Tunnel) that strip the path prefix before forwarding."""
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path", "")
+        if ROOT_PATH and not path.startswith(ROOT_PATH) and path.startswith("/"):
+            rest = path.lstrip("/")
+            if any(rest == p or rest.startswith(p + "/") for p in _API_PATH_PREFIXES):
+                request.scope["path"] = (ROOT_PATH + path) if path != "/" else ROOT_PATH
+        return await call_next(request)
+
+
+app.add_middleware(RootPathRewriteMiddleware)
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log each request: method, path, status code, duration. Uses PUBLIC_URL in logs when set."""

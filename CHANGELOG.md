@@ -17,6 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Dev proxy**: `proxy` in frontend `package.json` so local testing with one port (frontend at :3000, API at /api) is supported
 - **Docs**: README section "Production behind a reverse proxy" and "Testing locally with one port"; sanity check before deployment
 
+#### Production frontend image and proxy compatibility
+- **Multi-stage Docker build**: React frontend now builds in a Node stage and is served by nginx from a minimal runtime image
+- **nginx /api proxy**: Frontend container proxies `/api` to the backend container, with `X-Forwarded-*` headers preserved for HTTPS-terminating proxies
+- **Cloudflare /api/api compatibility**: Frontend uses `/api/api` when `REACT_APP_API_URL` is empty so Cloudflare (or similar) that strips one `/api` still hits `/api/auth/login` on the backend
+
 #### Sanity tests
 - **backend/tests/test_proxy_sanity.py**: Pytest tests for health at subpath, OpenAPI, CORS (PUBLIC_URL and localhost), auth routes
 - **scripts/sanity_check_proxy.sh**: Runs db + backend via Docker, pytest with PUBLIC_URL, then curl /api/health

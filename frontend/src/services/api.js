@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-// Empty or omitted = same-origin (backend on sub-path, e.g. /api behind reverse proxy)
+// Empty or omitted = same-origin; use /api/api when proxy strips one /api before backend
 const API_URL = process.env.REACT_APP_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 const api = axios.create({
-  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api',
+  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api/api',
   headers: {
     'Content-Type': 'application/json',
   },

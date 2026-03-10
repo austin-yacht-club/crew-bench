@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: crewbench_secret
       POSTGRES_DB: crewbench
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./db:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -20,10 +20,13 @@ services:
     ports:
       - "8000:8000"
     environment:
+      LOG_LEVEL: DEBUG
       DATABASE_URL: postgresql://crewbench:crewbench_secret@db:5432/crewbench
       SECRET_KEY: your-secret-key-change-in-production
       ADMIN_EMAIL: admin@crewbench.app
       ADMIN_PASSWORD: admin123
+      PUBLIC_URL: http://localhost:3333
+      ROOT_PATH: /api
     depends_on:
       db:
         condition: service_healthy
@@ -32,16 +35,14 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Same-origin /api when behind reverse proxy (set to full URL if API is on another host)
+        REACT_APP_API_URL: ""
+        # REACT_APP_RECAPTCHA_SITE_KEY: ""  # optional, for reCAPTCHA
     ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
+      - "3333:80"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
-volumes:
-  postgres_data:
