@@ -27,6 +27,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **scripts/sanity_check_proxy.sh**: Runs db + backend via Docker, pytest with PUBLIC_URL, then curl /api/health
 - **pytest** added to backend requirements
 
+### Improved
+
+#### Local routing (backend behind nginx)
+- **nginx**: Proxy now strips `/api` when forwarding (`proxy_pass http://backend:8000/`) so the backend receives paths like `/health`, `/auth/login`
+- **Backend**: Path-rewrite middleware always rewrites such paths to `/api/...` so routes match, independent of `ROOT_PATH`; local and production work with the same nginx config
+- **docker-compose.override.yml**: Optional override for local runs (clears `ROOT_PATH` and `PUBLIC_URL`) so logs stay clean when testing locally
+
+#### Events page when skipper is committed
+- **Event cards**: When the user has a skipper commitment for an event, show a disabled “Sailing my boat” button (info/outlined) instead of “Mark Available”
+- **Calendar tab**: Clicking an event for which the user is already committed no longer opens the Mark Availability dialog
+
+### Added (verification)
+
+- **scripts/verify_sailing_my_boat.sh**: Seeds an event, boat, and skipper commitment via API and prints steps to verify “Sailing my boat” in the UI
+
 ---
 
 ## [1.5.0] - 2026-03-09

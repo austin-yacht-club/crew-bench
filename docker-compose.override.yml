@@ -1,0 +1,8 @@
+# Local testing: no ROOT_PATH so backend responds at /api/* when hit directly or via proxy.
+# Use: docker compose up -d
+# Then open http://localhost:3333 (or http://localhost:3000 if using frontend dev server with proxy)
+services:
+  backend:
+    environment:
+      ROOT_PATH: ""
+      PUBLIC_URL: ""

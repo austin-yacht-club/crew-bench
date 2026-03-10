@@ -431,6 +431,16 @@ const EventsPage = () => {
                 >
                   Available
                 </Button>
+              ) : hasSkipperCommitmentForEvent(event.id) ? (
+                <Button
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  startIcon={<Sailing />}
+                  disabled
+                >
+                  Sailing my boat
+                </Button>
               ) : (
                 <Button
                   size="small"
@@ -708,7 +718,7 @@ const EventsPage = () => {
                                 fullWidth
                                 disableElevation
                                 variant="text"
-                                onClick={() => handleOpenDialog(event)}
+                                onClick={() => !isSkipper && handleOpenDialog(event)}
                                 sx={{
                                   justifyContent: 'flex-start',
                                   textAlign: 'left',

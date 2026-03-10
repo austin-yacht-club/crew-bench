@@ -93,24 +93,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API path segments (no leading slash) - when proxy strips ROOT_PATH we rewrite so routes match
+# When the proxy strips /api, backend receives /health, /auth/login, etc. We rewrite to /api/... so routes match.
 _API_PATH_PREFIXES = (
     "auth/", "auth", "docs", "openapi.json", "redoc", "health",
     "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
     "availability", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
     "admin/", "admin", "favorite-boats",
 )
+_API_PREFIX = "/api"
 
 
 class RootPathRewriteMiddleware(BaseHTTPMiddleware):
-    """When ROOT_PATH is set (e.g. /api) and the request path doesn't include it, rewrite so routes match.
-    Handles proxies (e.g. Cloudflare Tunnel) that strip the path prefix before forwarding."""
+    """If the request path does not start with /api but matches an API segment, rewrite to /api/...
+    so that our routes (all under /api) match. Handles proxies that strip the /api prefix."""
     async def dispatch(self, request: Request, call_next):
         path = request.scope.get("path", "")
-        if ROOT_PATH and not path.startswith(ROOT_PATH) and path.startswith("/"):
+        if not path.startswith(_API_PREFIX) and path.startswith("/"):
             rest = path.lstrip("/")
             if any(rest == p or rest.startswith(p + "/") for p in _API_PATH_PREFIXES):
-                request.scope["path"] = (ROOT_PATH + path) if path != "/" else ROOT_PATH
+                request.scope["path"] = (_API_PREFIX + path) if path != "/" else _API_PREFIX
         return await call_next(request)
 
 
