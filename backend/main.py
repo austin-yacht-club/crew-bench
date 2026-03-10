@@ -410,6 +410,58 @@ def save_push_subscription(
     return sub
 
 
+# Contacts: users connected via crew requests (sent or received)
+def _get_contact_user_ids(db: Session, user_id: int) -> List[int]:
+    """Return distinct user IDs that share at least one crew request with user_id (as crew or skipper)."""
+    # Skippers (boat owners) from requests where I am crew
+    skipper_ids = (
+        db.query(Boat.owner_id)
+        .join(CrewRequest, CrewRequest.boat_id == Boat.id)
+        .filter(CrewRequest.crew_id == user_id, Boat.owner_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    # Crew from requests where I am the boat owner
+    crew_ids = (
+        db.query(CrewRequest.crew_id)
+        .join(Boat, CrewRequest.boat_id == Boat.id)
+        .filter(Boat.owner_id == user_id)
+        .distinct()
+        .all()
+    )
+    ids = {r[0] for r in skipper_ids + crew_ids if r[0] and r[0] != user_id}
+    return list(ids)
+
+
+@app.get("/api/contacts", response_model=List[schemas.User])
+def list_contacts(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """List users that the current user has a connection with (via at least one crew request)."""
+    contact_ids = _get_contact_user_ids(db, current_user.id)
+    if not contact_ids:
+        return []
+    users = db.query(User).filter(User.id.in_(contact_ids), User.is_active == True).order_by(User.name).all()
+    return users
+
+
+@app.get("/api/contacts/{user_id}", response_model=schemas.User)
+def get_contact_profile(
+    user_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get a contact's profile. Only allowed for users who are connected via crew requests."""
+    contact_ids = _get_contact_user_ids(db, current_user.id)
+    if user_id not in contact_ids:
+        raise HTTPException(status_code=404, detail="User not found or not in your contacts")
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
 # Boat Routes
 @app.post("/api/boats", response_model=schemas.Boat)
 def create_boat(

@@ -30,6 +30,7 @@ import {
   CalendarMonth as CalendarIcon,
   AdminPanelSettings as AdminIcon,
   Person as PersonIcon,
+  ContactPage as ContactsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -56,6 +57,7 @@ const Layout = () => {
       { text: 'My Boats', icon: <BoatIcon />, path: '/boats' },
       { text: 'Find Crew', icon: <PeopleIcon />, path: '/find-crew' },
       { text: 'Requests', icon: <InboxIcon />, path: '/requests' },
+      { text: 'Contacts', icon: <ContactsIcon />, path: '/contacts' },
     ] : []),
     ...(user?.is_admin ? [
       { text: 'Admin', icon: <AdminIcon />, path: '/admin' },

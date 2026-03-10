@@ -132,6 +132,11 @@ export const pushAPI = {
   subscribe: (data) => api.post('/push-subscriptions', data),
 };
 
+export const contactsAPI = {
+  list: () => api.get('/contacts'),
+  get: (id) => api.get(`/contacts/${id}`),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),

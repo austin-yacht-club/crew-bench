@@ -15,6 +15,7 @@ import FindCrewPage from './pages/FindCrewPage';
 import RequestsPage from './pages/RequestsPage';
 import StatusPage from './pages/StatusPage';
 import AdminPage from './pages/AdminPage';
+import ContactsPage from './pages/ContactsPage';
 
 const theme = createTheme({
   palette: {
@@ -156,6 +157,9 @@ function App() {
               } />
               <Route path="profile" element={
                 <PrivateRoute><ProfilePage /></PrivateRoute>
+              } />
+              <Route path="contacts" element={
+                <PrivateRoute><ContactsPage /></PrivateRoute>
               } />
               <Route path="admin" element={
                 <AdminRoute><AdminPage /></AdminRoute>
