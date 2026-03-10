@@ -62,6 +62,12 @@ This document tracks planned features, improvements, and known issues.
 - [x] Favorite boats for crew (quick add when marking availability; star to add/remove)
 - [x] Proper logging (level, format, optional file; request middleware; exception logging)
 
+### v1.6.0 Additions
+- [x] Reverse-proxy / sub-path deployment (backend on same host at `/api`; PUBLIC_URL, ROOT_PATH, CORS_ORIGINS env)
+- [x] Request logs show public URL when PUBLIC_URL set
+- [x] Frontend relative API URL (empty REACT_APP_API_URL = same-origin `/api`); dev proxy in package.json
+- [x] Sanity tests for proxy deployment (pytest + script); README docs for Cloudflare Zero Trust
+
 ---
 
 ## Planned Features
@@ -135,10 +141,10 @@ This document tracks planned features, improvements, and known issues.
 
 ### Technical Debt
 - [ ] Add database migrations (Alembic) instead of recreating tables
-- [ ] Add unit tests for backend API
+- [x] Add unit tests for backend API (proxy sanity tests in backend/tests/test_proxy_sanity.py)
 - [ ] Add integration tests for frontend
 - [ ] Add error boundary components in React
-- [ ] Implement proper logging system
+- [x] Implement proper logging system
 
 ### Performance
 - [ ] Add pagination to list endpoints

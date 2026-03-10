@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Empty or omitted = same-origin (backend on sub-path, e.g. /api behind reverse proxy)
+const API_URL = process.env.REACT_APP_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api',
   headers: {
     'Content-Type': 'application/json',
   },

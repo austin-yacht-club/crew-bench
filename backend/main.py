@@ -3,6 +3,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional
+from urllib.parse import urlparse
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -16,6 +17,11 @@ from database import engine, get_db, Base
 from log_config import configure_logging
 
 logger = configure_logging("crew_bench")
+
+# Reverse proxy / sub-path deployment (e.g. Cloudflare Zero Trust)
+ROOT_PATH = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
+PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
+CORS_ORIGINS_ENV = (os.getenv("CORS_ORIGINS") or "").strip()
 from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat
 import schemas
 from auth import (
@@ -56,15 +62,32 @@ def _verify_recaptcha(token: Optional[str]) -> bool:
         logger.warning("reCAPTCHA verification failed: %s", e)
         return False
 
+def _cors_origins() -> List[str]:
+    origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    if CORS_ORIGINS_ENV:
+        origins.extend(o.strip() for o in CORS_ORIGINS_ENV.split(",") if o.strip())
+    if PUBLIC_URL:
+        try:
+            p = urlparse(PUBLIC_URL)
+            if p.scheme and p.netloc:
+                origin = f"{p.scheme}://{p.netloc}"
+                if origin not in origins:
+                    origins.append(origin)
+        except Exception:
+            pass
+    return origins
+
+
 app = FastAPI(
     title="Crew Bench",
     description="Match sailing crew to boats for racing events",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=ROOT_PATH or None,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,7 +95,7 @@ app.add_middleware(
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log each request: method, path, status code, duration."""
+    """Log each request: method, path, status code, duration. Uses PUBLIC_URL in logs when set."""
 
     async def dispatch(self, request: Request, call_next):
         start = time.perf_counter()
@@ -81,6 +104,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if request.query_params:
             path = f"{path}?{request.query_params}"
+        if PUBLIC_URL:
+            path = f"{PUBLIC_URL}{path}" if path.startswith("/") else f"{PUBLIC_URL}/{path}"
         level = logging.WARNING if response.status_code >= 500 else logging.INFO
         logger.log(
             level,
@@ -107,7 +132,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def startup_event():
-    """Create default admin user on startup if it doesn't exist."""
+    """Log reverse-proxy config and create default admin user on startup if needed."""
+    if PUBLIC_URL:
+        logger.info("Reverse proxy / public URL: %s", PUBLIC_URL)
+    if ROOT_PATH:
+        logger.info("Root path: %s", ROOT_PATH)
     db = next(get_db())
     admin_email = os.getenv("ADMIN_EMAIL", "admin@crewbench.app")
     admin_password = os.getenv("ADMIN_PASSWORD", "admin123")

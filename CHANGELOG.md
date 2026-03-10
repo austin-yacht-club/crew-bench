@@ -4,6 +4,26 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.0] - 2026-03-10
+
+### Added
+
+#### Reverse-proxy / sub-path deployment
+- **Backend on same host**: Support for hosting the API on a sub-path (e.g. `/api`) behind a reverse proxy (e.g. Cloudflare Zero Trust) when only one port is available
+- **PUBLIC_URL**: Optional env var; when set, logged at startup and included in each request log line so logs reflect the public URL
+- **ROOT_PATH**: Optional env for FastAPI `root_path` when the proxy strips the path prefix
+- **CORS_ORIGINS**: Optional comma-separated allowed origins; origin derived from `PUBLIC_URL` is automatically allowed
+- **Frontend**: Empty or omitted `REACT_APP_API_URL` in production uses same-origin relative `/api` requests
+- **Dev proxy**: `proxy` in frontend `package.json` so local testing with one port (frontend at :3000, API at /api) is supported
+- **Docs**: README section "Production behind a reverse proxy" and "Testing locally with one port"; sanity check before deployment
+
+#### Sanity tests
+- **backend/tests/test_proxy_sanity.py**: Pytest tests for health at subpath, OpenAPI, CORS (PUBLIC_URL and localhost), auth routes
+- **scripts/sanity_check_proxy.sh**: Runs db + backend via Docker, pytest with PUBLIC_URL, then curl /api/health
+- **pytest** added to backend requirements
+
+---
+
 ## [1.5.0] - 2026-03-09
 
 ### Added
