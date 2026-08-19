@@ -379,3 +379,30 @@ class PushSubscription(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class DateRange(BaseModel):
+    start: str  # YYYY-MM-DD
+    end: str    # YYYY-MM-DD
+
+
+class CrewInterestBase(BaseModel):
+    notes: Optional[str] = None
+    patterns: Optional[List[str]] = []
+    date_ranges: Optional[List[DateRange]] = []
+    is_active: Optional[bool] = True
+
+
+class CrewInterestCreate(CrewInterestBase):
+    pass
+
+
+class CrewInterest(CrewInterestBase):
+    id: int
+    crew_id: int
+    created_at: datetime
+    updated_at: datetime
+    crew: Optional[User] = None
+
+    class Config:
+        from_attributes = True

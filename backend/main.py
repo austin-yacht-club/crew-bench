@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import json
 from datetime import datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -22,7 +23,7 @@ logger = configure_logging("crew_bench")
 ROOT_PATH = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
 PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
 CORS_ORIGINS_ENV = (os.getenv("CORS_ORIGINS") or "").strip()
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat, CrewInterest
 import schemas
 from auth import (
     get_password_hash,
@@ -100,7 +101,7 @@ app.add_middleware(
 _API_PATH_PREFIXES = (
     "auth/", "auth", "health",
     "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
-    "availability", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
+    "availability", "crew-pool", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
     "admin/", "admin", "favorite-boats",
 )
 _API_PREFIX = "/api"
@@ -834,6 +835,132 @@ def mark_series_availability(
         created_availabilities.append(db_availability)
     
     return created_availabilities
+
+
+VALID_AVAILABILITY_PATTERNS = {"saturdays", "sundays", "weekends", "weekdays", "flexible"}
+
+
+def _serialize_patterns(patterns: Optional[List[str]]) -> Optional[str]:
+    if not patterns:
+        return None
+    cleaned = [p.strip().lower() for p in patterns if p and p.strip().lower() in VALID_AVAILABILITY_PATTERNS]
+    return ",".join(dict.fromkeys(cleaned)) if cleaned else None
+
+
+def _deserialize_patterns(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    return [p for p in raw.split(",") if p in VALID_AVAILABILITY_PATTERNS]
+
+
+def _serialize_date_ranges(ranges: Optional[List[schemas.DateRange]]) -> Optional[str]:
+    if not ranges:
+        return None
+    payload = [{"start": r.start, "end": r.end} for r in ranges if r.start and r.end]
+    return json.dumps(payload) if payload else None
+
+
+def _deserialize_date_ranges(raw: Optional[str]) -> List[dict]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [{"start": r.get("start"), "end": r.get("end")} for r in data if r.get("start") and r.get("end")]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _crew_interest_to_schema(interest: CrewInterest) -> schemas.CrewInterest:
+    return schemas.CrewInterest(
+        id=interest.id,
+        crew_id=interest.crew_id,
+        is_active=interest.is_active,
+        notes=interest.notes,
+        patterns=_deserialize_patterns(interest.patterns),
+        date_ranges=[schemas.DateRange(**r) for r in _deserialize_date_ranges(interest.date_ranges)],
+        created_at=interest.created_at,
+        updated_at=interest.updated_at,
+        crew=interest.crew,
+    )
+
+
+# Crew Pool (generic interest, not event-specific)
+@app.get("/api/crew-pool", response_model=List[schemas.CrewInterest])
+def list_crew_pool(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """List crew members actively looking for opportunities (skipper view)."""
+    interests = (
+        db.query(CrewInterest)
+        .options(joinedload(CrewInterest.crew))
+        .filter(CrewInterest.is_active == True, CrewInterest.crew.has(User.is_active == True))
+        .order_by(CrewInterest.updated_at.desc())
+        .all()
+    )
+    return [_crew_interest_to_schema(i) for i in interests]
+
+
+@app.get("/api/crew-pool/my", response_model=Optional[schemas.CrewInterest])
+def get_my_crew_interest(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    interest = (
+        db.query(CrewInterest)
+        .options(joinedload(CrewInterest.crew))
+        .filter(CrewInterest.crew_id == current_user.id)
+        .first()
+    )
+    return _crew_interest_to_schema(interest) if interest else None
+
+
+@app.put("/api/crew-pool", response_model=schemas.CrewInterest)
+def upsert_crew_interest(
+    data: schemas.CrewInterestCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Create or update generic crew interest profile."""
+    interest = db.query(CrewInterest).filter(CrewInterest.crew_id == current_user.id).first()
+    patterns = _serialize_patterns(data.patterns)
+    date_ranges = _serialize_date_ranges(data.date_ranges)
+    is_active = data.is_active if data.is_active is not None else True
+
+    if interest:
+        interest.notes = data.notes
+        interest.patterns = patterns
+        interest.date_ranges = date_ranges
+        interest.is_active = is_active
+        interest.updated_at = datetime.utcnow()
+    else:
+        interest = CrewInterest(
+            crew_id=current_user.id,
+            notes=data.notes,
+            patterns=patterns,
+            date_ranges=date_ranges,
+            is_active=is_active,
+        )
+        db.add(interest)
+
+    db.commit()
+    db.refresh(interest)
+    return _crew_interest_to_schema(interest)
+
+
+@app.delete("/api/crew-pool")
+def remove_crew_interest(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    interest = db.query(CrewInterest).filter(CrewInterest.crew_id == current_user.id).first()
+    if not interest:
+        raise HTTPException(status_code=404, detail="No crew interest profile found")
+    db.delete(interest)
+    db.commit()
+    return {"message": "Crew interest removed"}
 
 
 @app.get("/api/series", response_model=List[str])

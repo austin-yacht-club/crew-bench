@@ -70,6 +70,7 @@ class User(Base):
     crew_requests = relationship("CrewRequest", foreign_keys="CrewRequest.crew_id", back_populates="crew")
     available_for_events = relationship("CrewAvailability", back_populates="crew")
     favorite_boats = relationship("FavoriteBoat", back_populates="user", foreign_keys="FavoriteBoat.user_id")
+    crew_interest = relationship("CrewInterest", back_populates="crew", uselist=False)
 
 
 class Fleet(Base):
@@ -149,6 +150,22 @@ availability_fleets = Table(
     Column('availability_id', Integer, ForeignKey('crew_availabilities.id'), primary_key=True),
     Column('fleet_id', Integer, ForeignKey('fleets.id'), primary_key=True)
 )
+
+
+class CrewInterest(Base):
+    """Generic crew interest — not tied to a specific event."""
+    __tablename__ = "crew_interests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    crew_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+    notes = Column(Text)
+    patterns = Column(Text)  # comma-separated: saturdays,sundays,weekends,weekdays,flexible
+    date_ranges = Column(Text)  # JSON array of {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    crew = relationship("User", back_populates="crew_interest")
 
 
 class CrewAvailability(Base):

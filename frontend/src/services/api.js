@@ -137,6 +137,13 @@ export const contactsAPI = {
   get: (id) => api.get(`/contacts/${id}`),
 };
 
+export const crewPoolAPI = {
+  list: () => api.get('/crew-pool'),
+  getMy: () => api.get('/crew-pool/my'),
+  upsert: (data) => api.put('/crew-pool', data),
+  remove: () => api.delete('/crew-pool'),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),

@@ -13,6 +13,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Avatar,
   Menu,
   MenuItem,
@@ -31,6 +32,7 @@ import {
   AdminPanelSettings as AdminIcon,
   Person as PersonIcon,
   ContactPage as ContactsIcon,
+  Groups as GroupsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -50,18 +52,37 @@ const Layout = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const menuItems = [
-    { text: 'Events', icon: <EventIcon />, path: '/events' },
-    ...(user ? [
-      { text: 'My Schedule', icon: <CalendarIcon />, path: '/status' },
-      { text: 'My Boats', icon: <BoatIcon />, path: '/boats' },
-      { text: 'Find Crew', icon: <PeopleIcon />, path: '/find-crew' },
-      { text: 'Requests', icon: <InboxIcon />, path: '/requests' },
-      { text: 'Contacts', icon: <ContactsIcon />, path: '/contacts' },
-    ] : []),
-    ...(user?.is_admin ? [
-      { text: 'Admin', icon: <AdminIcon />, path: '/admin' },
-    ] : []),
+  const menuSections = [
+    {
+      header: 'General Crew',
+      items: [
+        { text: 'Crew Pool', icon: <GroupsIcon />, path: '/crew-pool' },
+      ],
+    },
+    {
+      header: 'Race Events',
+      items: [
+        { text: 'Browse Events', icon: <EventIcon />, path: '/events' },
+        ...(user ? [
+          { text: 'Find Crew (Events)', icon: <PeopleIcon />, path: '/find-crew' },
+        ] : []),
+      ],
+    },
+    ...(user ? [{
+      header: 'My Account',
+      items: [
+        { text: 'My Schedule', icon: <CalendarIcon />, path: '/status' },
+        { text: 'My Boats', icon: <BoatIcon />, path: '/boats' },
+        { text: 'Requests', icon: <InboxIcon />, path: '/requests' },
+        { text: 'Contacts', icon: <ContactsIcon />, path: '/contacts' },
+      ],
+    }] : []),
+    ...(user?.is_admin ? [{
+      header: 'Administration',
+      items: [
+        { text: 'Admin', icon: <AdminIcon />, path: '/admin' },
+      ],
+    }] : []),
   ];
 
   const drawer = (
@@ -76,30 +97,37 @@ const Layout = () => {
       </Box>
       <Divider />
       <List sx={{ px: 1 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) setMobileOpen(false);
-              }}
-              selected={location.pathname === item.path}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'primary.light',
-                  color: 'white',
-                  '& .MuiListItemIcon-root': {
-                    color: 'white',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
+        {menuSections.map((section) => (
+          <Box key={section.header}>
+            <ListSubheader sx={{ bgcolor: 'transparent', lineHeight: '32px', fontWeight: 600 }}>
+              {section.header}
+            </ListSubheader>
+            {section.items.map((item) => (
+              <ListItem key={item.text} disablePadding>
+                <ListItemButton
+                  onClick={() => {
+                    navigate(item.path);
+                    if (isMobile) setMobileOpen(false);
+                  }}
+                  selected={location.pathname === item.path}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    '&.Mui-selected': {
+                      backgroundColor: 'primary.light',
+                      color: 'white',
+                      '& .MuiListItemIcon-root': {
+                        color: 'white',
+                      },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </Box>
         ))}
       </List>
     </Box>

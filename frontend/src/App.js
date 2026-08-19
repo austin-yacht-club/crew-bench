@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import CrewPoolPage from './pages/CrewPoolPage';
 import EventsPage from './pages/EventsPage';
 import BoatsPage from './pages/BoatsPage';
 import ProfilePage from './pages/ProfilePage';
@@ -142,6 +143,9 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
+              <Route path="crew-pool" element={
+                <PrivateRoute><CrewPoolPage /></PrivateRoute>
+              } />
               <Route path="events" element={<EventsPage />} />
               <Route path="boats" element={
                 <PrivateRoute><BoatsPage /></PrivateRoute>
