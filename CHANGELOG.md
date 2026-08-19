@@ -4,6 +4,13 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.1] - 2026-08-19
+
+### Fixed
+
+#### OpenAPI/docs behind reverse proxy
+- **Path-rewrite middleware**: No longer rewrites `/openapi.json`, `/docs`, and `/redoc` to `/api/...`. FastAPI serves these at the root and handles the proxied sub-path via `root_path`, so the previous rewrite pointed them at non-existent routes and returned 404 (broke `/openapi.json`, Swagger UI, and ReDoc, and the `test_openapi_available_at_subpath` sanity test). API routes (`/health`, `/auth/*`, etc.) are still rewritten as before.
+
 ## [1.6.0] - 2026-03-10
 
 ### Added
