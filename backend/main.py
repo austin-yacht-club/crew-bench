@@ -94,8 +94,11 @@ app.add_middleware(
 )
 
 # When the proxy strips /api, backend receives /health, /auth/login, etc. We rewrite to /api/... so routes match.
+# Note: docs/openapi.json/redoc are intentionally excluded. FastAPI serves them at the root
+# (e.g. /openapi.json), not under /api, and handles the proxied sub-path itself via root_path,
+# so rewriting them to /api/... would point at non-existent routes and 404.
 _API_PATH_PREFIXES = (
-    "auth/", "auth", "docs", "openapi.json", "redoc", "health",
+    "auth/", "auth", "health",
     "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
     "availability", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
     "admin/", "admin", "favorite-boats",
