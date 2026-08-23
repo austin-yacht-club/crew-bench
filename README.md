@@ -32,6 +32,10 @@ Register as **crew** or **skipper**, then complete your profile (experience, wei
 
 ![Profile](docs/images/profile.png)
 
+**Crew Pool email alerts** (skippers): on Profile, enable **Email me when new crew join the Crew Pool**. Alerts fire when someone newly registers interest or re-activates a hidden profile (at most one email per hour by default). Without SMTP configured, emails are logged for local development.
+
+![Crew Pool email alerts preference](docs/images/profile_crew_pool_alerts.png)
+
 ### 2. Crew Pool — general interest (no event required)
 
 Use **Crew Pool** when you want to crew generally, or when skippers want to find people without selecting a race first.
