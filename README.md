@@ -150,6 +150,8 @@ Optional: set `PUBLIC_URL=http://localhost:3000` when starting the backend so re
 - `ADMIN_PASSWORD` - Default admin password
 - `RECAPTCHA_SECRET_KEY` - Optional. reCAPTCHA v2 secret key for registration CAPTCHA. If set, new users must pass CAPTCHA verification.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Optional. Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS` - Optional. When `SMTP_HOST` is set, crew pool alert emails are sent via SMTP; otherwise they are logged (dev/test).
+- `CREW_POOL_ALERT_COOLDOWN_SECONDS` - Optional. Per-skipper cooldown between crew pool alert emails (default: 3600). Set to `0` to disable rate limiting.
 - `LOG_LEVEL` - Optional. Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO).
 - `LOG_FILE` - Optional. Path to log file; if set, logs are also written to a rotating file (see LOG_MAX_BYTES, LOG_BACKUP_COUNT).
 - `LOG_MAX_BYTES` - Optional. Max bytes per log file when using LOG_FILE (default: 5MB).
