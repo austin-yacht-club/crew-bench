@@ -430,18 +430,56 @@ Secrets are read from a project-root environment file (gitignored) or from the p
 - `CORS_ORIGINS` - Comma-separated list of allowed CORS origins. The origin derived from `PUBLIC_URL` is automatically allowed when set.
 
 ### Frontend
-- `REACT_APP_API_URL` - Backend base URL. Omit or set empty in production when the backend is on the same host (e.g. behind a reverse proxy at `/api`); the app will use relative `/api` requests. For local development without a proxy, defaults to `http://localhost:8000`.
+- `API_BASE_PATH` - **Runtime** browser API base (preferred). Default `/api`. Set on the frontend container; takes effect on recreate — **no image rebuild**. Use `/api/api` only when an outer proxy strips one `/api` before the backend.
+- `REACT_APP_API_URL` - Legacy bake-time override (avoid). Empty → `/api`; unset in local CRA → `http://localhost:8000/api`. Prefer `API_BASE_PATH` in Docker.
 - `REACT_APP_RECAPTCHA_SITE_KEY` - Optional. reCAPTCHA v2 site key (must be set if backend uses `RECAPTCHA_SECRET_KEY`).
 
 ## Production behind a reverse proxy (e.g. Cloudflare Zero Trust)
 
-When you cannot use different ports and must serve the backend on a sub-path of the same host as the frontend:
+Crew Bench expects the browser to call **`/api/...`** (login = `POST /api/auth/login`). That path is controlled by **`API_BASE_PATH`** (default `/api`), injected at frontend container start via `/config.js` — you can change it without rebuilding.
 
-1. **Reverse proxy**: Route the same host so that path prefix `/api` is proxied to the backend (e.g. `https://yourapp.com/api/*` → `http://backend:8000/api/*`). Do not strip the path prefix so the backend receives paths like `/api/health`, `/api/auth/login`, etc.
+### Recommended topology (preferred)
 
-2. **Backend**: Set `PUBLIC_URL` to the public base URL (e.g. `https://yourapp.com`). Optionally set `CORS_ORIGINS` if you need additional origins. Request logs will show the public URL in each line.
+Send **all** public traffic to the frontend container (prod port `3333` by default). Its nginx proxies `/api/` to the backend. Keep `API_BASE_PATH=/api`.
 
-3. **Frontend**: Build with `REACT_APP_API_URL` empty (or unset) so API requests go to the same origin (e.g. `https://yourapp.com/api/...`). No separate backend port is needed.
+```
+Internet → reverse proxy → frontend:80
+                              ├─ /        → SPA
+                              └─ /api/*   → backend:8000 (one strip, then middleware restores /api)
+```
+
+### Split-path topology
+
+If the reverse proxy must route `/api` itself:
+
+- Forward `/api/*` → backend **without stripping** `/api` (backend must see `/api/health`, `/api/auth/login`).
+- Keep `API_BASE_PATH=/api`.
+
+### Strip-once outer proxy (uncommon)
+
+Only if the proxy strips exactly one `/api` before the backend:
+
+```bash
+# in .env.prod — recreate frontend, no rebuild
+API_BASE_PATH=/api/api
+./scripts/compose.sh prod up -d frontend
+```
+
+Do **not** bake `/api/api` into the image; that is how login 404s came back before.
+
+### Backend
+
+Set `PUBLIC_URL` to the public base URL (e.g. `https://yourapp.com`). Optionally set `CORS_ORIGINS`.
+
+### Diagnose login/register 404
+
+```bash
+./scripts/check_api_path.sh https://yourapp.com
+# or against the published frontend port on the Pi:
+./scripts/check_api_path.sh http://rpi5-1:3333
+```
+
+In the browser Network tab, login must be `POST /api/auth/login` (or `POST {API_BASE_PATH}/auth/login`). If you see `/api/api/...` while the host expects `/api`, set `API_BASE_PATH=/api` and recreate the frontend container.
 
 ### Sanity check before deployment
 

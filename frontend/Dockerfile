@@ -8,7 +8,7 @@ RUN npm install
 
 COPY . .
 
-# Env vars for CRA are baked in at build time (default: same-origin /api)
+# Optional bake-time overrides (prefer runtime API_BASE_PATH via entrypoint).
 ARG REACT_APP_API_URL=
 ARG REACT_APP_RECAPTCHA_SITE_KEY=
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
@@ -20,8 +20,13 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 COPY --from=builder /app/build /usr/share/nginx/html
+
+# Default browser API path; override at runtime without rebuilding.
+ENV API_BASE_PATH=/api
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

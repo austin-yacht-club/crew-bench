@@ -56,10 +56,14 @@ services:
     build:
       context: ./frontend
       args:
-        # Same-origin /api through the bundled nginx proxy (set to a full URL
-        # only if the API is served from another host).
+        # Prefer runtime API_BASE_PATH (no rebuild). Build args are fallbacks only.
         REACT_APP_API_URL: ${REACT_APP_API_URL:-}
         REACT_APP_RECAPTCHA_SITE_KEY: ${REACT_APP_RECAPTCHA_SITE_KEY:-}
+    environment:
+      # Browser API base path — change without rebuilding the frontend image.
+      #   /api       default (recommended)
+      #   /api/api   only if the outer reverse proxy strips one /api before the backend
+      API_BASE_PATH: ${API_BASE_PATH:-/api}
     depends_on:
       - backend
 
