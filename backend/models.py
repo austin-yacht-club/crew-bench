@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, Table
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -42,6 +42,10 @@ class ContactPreference(str, enum.Enum):
     ANY = "any"
 
 
+class ConversationSource(str, enum.Enum):
+    CREW_POOL = "crew_pool"
+
+
 class User(Base):
     __tablename__ = "users"
     
@@ -61,6 +65,8 @@ class User(Base):
     allow_phone_contact = Column(Boolean, default=False)
     allow_sms_contact = Column(Boolean, default=False)
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
+    crew_pool_email_alerts = Column(Boolean, default=False)
+    last_crew_pool_alert_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     must_change_password = Column(Boolean, default=False)
@@ -70,6 +76,7 @@ class User(Base):
     crew_requests = relationship("CrewRequest", foreign_keys="CrewRequest.crew_id", back_populates="crew")
     available_for_events = relationship("CrewAvailability", back_populates="crew")
     favorite_boats = relationship("FavoriteBoat", back_populates="user", foreign_keys="FavoriteBoat.user_id")
+    crew_interest = relationship("CrewInterest", back_populates="crew", uselist=False)
 
 
 class Fleet(Base):
@@ -149,6 +156,22 @@ availability_fleets = Table(
     Column('availability_id', Integer, ForeignKey('crew_availabilities.id'), primary_key=True),
     Column('fleet_id', Integer, ForeignKey('fleets.id'), primary_key=True)
 )
+
+
+class CrewInterest(Base):
+    """Generic crew interest — not tied to a specific event."""
+    __tablename__ = "crew_interests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    crew_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+    notes = Column(Text)
+    patterns = Column(Text)  # comma-separated: saturdays,sundays,weekends,weekdays,flexible
+    date_ranges = Column(Text)  # JSON array of {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    crew = relationship("User", back_populates="crew_interest")
 
 
 class CrewAvailability(Base):
@@ -281,3 +304,36 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User")
+
+
+class Conversation(Base):
+    """Direct-message thread between a skipper and crew member."""
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("skipper_id", "crew_id", "source", name="uq_conversation_participants_source"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    skipper_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    crew_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    source = Column(String, default=ConversationSource.CREW_POOL.value, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    skipper = relationship("User", foreign_keys=[skipper_id])
+    crew = relationship("User", foreign_keys=[crew_id])
+    messages = relationship("DirectMessage", back_populates="conversation", order_by="DirectMessage.created_at")
+
+
+class DirectMessage(Base):
+    """A single in-app message within a conversation."""
+    __tablename__ = "direct_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User")

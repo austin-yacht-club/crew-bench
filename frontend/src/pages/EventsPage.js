@@ -460,7 +460,10 @@ const EventsPage = () => {
   return (
     <Box>
       <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
-        Upcoming Events
+        Race Events
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+        Mark availability for specific races and series. For general crew interest without picking events, use Crew Pool.
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
         Browse upcoming sailing events and mark your availability

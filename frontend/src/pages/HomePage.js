@@ -112,18 +112,32 @@ const HomePage = () => {
             </Box>
           )}
           {user && (
-            <Button
-              variant="contained"
-              size="large"
-              onClick={() => navigate('/events')}
-              sx={{
-                backgroundColor: 'white',
-                color: 'primary.main',
-                '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' },
-              }}
-            >
-              Browse Events
-            </Button>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'center' }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={() => navigate('/crew-pool')}
+                sx={{
+                  backgroundColor: 'white',
+                  color: 'primary.main',
+                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' },
+                }}
+              >
+                Crew Pool
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => navigate('/events')}
+                sx={{
+                  borderColor: 'white',
+                  color: 'white',
+                  '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' },
+                }}
+              >
+                Race Events
+              </Button>
+            </Box>
           )}
         </Container>
       </Box>
@@ -131,23 +145,23 @@ const HomePage = () => {
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
           <FeatureCard
-            icon={<Event sx={{ fontSize: 48 }} />}
-            title="Browse Events"
-            description="View upcoming races, regattas, and sailing events in your area"
+            icon={<People sx={{ fontSize: 48 }} />}
+            title="Crew Pool"
+            description="Register general availability or browse crew looking for opportunities — no event required"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <FeatureCard
-            icon={<People sx={{ fontSize: 48 }} />}
-            title="Find Crew"
-            description="Connect with experienced sailors looking to crew on your boat"
+            icon={<Event sx={{ fontSize: 48 }} />}
+            title="Race Events"
+            description="Mark availability for specific races, regattas, and series"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <FeatureCard
             icon={<DirectionsBoat sx={{ fontSize: 48 }} />}
-            title="Join a Boat"
-            description="Mark your availability and get invited to sail on boats"
+            title="Find Crew"
+            description="Skippers invite crew for specific events or browse the general crew pool"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -172,15 +186,15 @@ const HomePage = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" color="primary">2. Mark Availability</Typography>
+              <Typography variant="h6" color="primary">2. Share Availability</Typography>
               <Typography variant="body2" color="text.secondary">
-                Browse events and mark which ones you're available for
+                Join the Crew Pool for general interest, or mark availability for specific race events
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
               <Typography variant="h6" color="primary">3. Connect & Sail</Typography>
               <Typography variant="body2" color="text.secondary">
-                Skippers invite crew, crew accepts, and you're ready to race!
+                Skippers find crew, crew accepts invitations, and you&apos;re ready to race!
               </Typography>
             </Grid>
           </Grid>

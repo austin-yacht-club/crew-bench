@@ -60,7 +60,7 @@ const ContactsPage = () => {
         Contacts
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-        People you’re connected with through crew requests. Tap a contact to view their profile.
+        People you’re connected with through crew requests or Crew Pool messages. Tap a contact to view their profile.
       </Typography>
 
       {error && (

@@ -137,6 +137,21 @@ export const contactsAPI = {
   get: (id) => api.get(`/contacts/${id}`),
 };
 
+export const crewPoolAPI = {
+  list: () => api.get('/crew-pool'),
+  getMy: () => api.get('/crew-pool/my'),
+  upsert: (data) => api.put('/crew-pool', data),
+  remove: () => api.delete('/crew-pool'),
+  getCrewProfile: (userId) => api.get(`/crew-pool/crew/${userId}`),
+};
+
+export const conversationsAPI = {
+  list: () => api.get('/conversations'),
+  get: (id) => api.get(`/conversations/${id}`),
+  start: (crewId, message) => api.post('/conversations', { crew_id: crewId, message }),
+  sendMessage: (conversationId, body) => api.post(`/conversations/${conversationId}/messages`, { body }),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
