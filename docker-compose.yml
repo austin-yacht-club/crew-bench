@@ -1,16 +1,19 @@
+# Secrets come from the project `.env` file (or exported environment variables).
+# Compose refuses to start if required secrets are missing or empty.
+# Copy .env.example to .env and run ./scripts/generate_secrets.sh first.
 services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: crewbench
-      POSTGRES_PASSWORD: crewbench_secret
-      POSTGRES_DB: crewbench
+      POSTGRES_USER: ${POSTGRES_USER:-crewbench}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
+      POSTGRES_DB: ${POSTGRES_DB:-crewbench}
     volumes:
       - ./db:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crewbench"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crewbench}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,13 +23,18 @@ services:
     ports:
       - "8000:8000"
     environment:
-      LOG_LEVEL: DEBUG
-      DATABASE_URL: postgresql://crewbench:crewbench_secret@db:5432/crewbench
-      SECRET_KEY: your-secret-key-change-in-production
-      ADMIN_EMAIL: admin@crewbench.app
-      ADMIN_PASSWORD: admin123
-      PUBLIC_URL: http://localhost:3333
-      ROOT_PATH: /api
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crewbench}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}@db:5432/${POSTGRES_DB:-crewbench}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3333}
+      ROOT_PATH: ${ROOT_PATH:-/api}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      LOG_FILE: ${LOG_FILE:-}
     depends_on:
       db:
         condition: service_healthy
@@ -45,4 +53,3 @@ services:
       - "3333:80"
     depends_on:
       - backend
-

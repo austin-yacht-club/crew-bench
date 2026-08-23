@@ -4,9 +4,35 @@
 # Must tolerate restarts (idempotent) and return once the database is ready.
 set -euo pipefail
 
-DB_USER="crewbench"
-DB_PASSWORD="crewbench_secret"
-DB_NAME="crewbench"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+if [[ ! -f "$REPO_ROOT/.env" ]]; then
+  echo "==> Generating .env with unique secrets (first boot)"
+  "$REPO_ROOT/scripts/generate_secrets.sh"
+fi
+
+set -a
+# shellcheck disable=SC1091
+source "$REPO_ROOT/.env"
+set +a
+
+DB_USER="${POSTGRES_USER:-crewbench}"
+DB_PASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
+DB_NAME="${POSTGRES_DB:-crewbench}"
+
+if [[ ! "$DB_USER" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  echo "error: POSTGRES_USER contains unsafe characters" >&2
+  exit 1
+fi
+if [[ ! "$DB_PASSWORD" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+  echo "error: POSTGRES_PASSWORD contains characters that cannot be applied safely here" >&2
+  exit 1
+fi
+if [[ ! "$DB_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  echo "error: POSTGRES_DB contains unsafe characters" >&2
+  exit 1
+fi
 
 echo "==> Starting PostgreSQL cluster"
 # Discover the installed cluster (version may differ across base images).
@@ -34,6 +60,8 @@ sudo -u postgres psql -v ON_ERROR_STOP=1 -c \
   "DO \$\$ BEGIN
      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${DB_USER}') THEN
        CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}';
+     ELSE
+       ALTER ROLE ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';
      END IF;
    END \$\$;"
 

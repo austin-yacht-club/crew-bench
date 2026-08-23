@@ -1,4 +1,3 @@
-import os
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -8,10 +7,11 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from database import get_db
+from settings import get_secret_key
 import models
 import schemas
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 

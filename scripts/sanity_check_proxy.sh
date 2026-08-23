@@ -7,6 +7,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
+if [[ -z "${POSTGRES_PASSWORD:-}" || -z "${SECRET_KEY:-}" || -z "${ADMIN_PASSWORD:-}" ]]; then
+  echo "error: required secrets are not set." >&2
+  echo "Run ./scripts/generate_secrets.sh (or copy .env.example to .env and fill it in) first." >&2
+  exit 1
+fi
+
 PUBLIC_URL="${PUBLIC_URL:-https://app.example.com}"
 
 echo "=== Sanity check: reverse-proxy / sub-path (PUBLIC_URL=$PUBLIC_URL) ==="

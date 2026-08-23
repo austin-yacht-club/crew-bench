@@ -15,7 +15,8 @@ Crew Bench is a web application that matches sailing crew with boats for racing 
 
 ```bash
 cd crew-bench
-docker-compose up -d
+./scripts/generate_secrets.sh   # once; creates gitignored .env
+docker compose up -d
 ```
 
 ### Rebuilding After Changes
@@ -45,10 +46,9 @@ docker logs crew-bench-frontend-1
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
-### Default Admin Credentials
+### Admin credentials
 
-- Email: `admin@crewbench.app`
-- Password: `admin123`
+There is no default admin password. After `./scripts/generate_secrets.sh`, use `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`. The admin must change the password on first login.
 
 ## Code Structure
 
@@ -59,6 +59,7 @@ crew-bench/
 │   ├── models.py        # SQLAlchemy ORM models
 │   ├── schemas.py       # Pydantic request/response schemas
 │   ├── auth.py          # Authentication utilities
+│   ├── settings.py      # Required secrets; fail-closed validation
 │   ├── database.py      # Database connection setup
 │   ├── calendar_importer.py  # External calendar scraping
 │   ├── requirements.txt # Python dependencies
@@ -76,6 +77,8 @@ crew-bench/
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
+├── .env.example             # Template for required secrets (copy to .env)
+├── scripts/generate_secrets.sh
 ├── CHANGELOG.md
 ├── README.md
 └── AGENT.md
@@ -208,10 +211,19 @@ Use the Swagger UI at http://localhost:8000/docs to test API endpoints directly.
 ### Database Issues
 
 ```bash
-# Reset database completely
-docker-compose down -v
-docker-compose up -d --build
+# Reset database completely (also needed if you rotate POSTGRES_PASSWORD)
+docker compose down -v
+docker compose up -d --build
 ```
+
+### Missing secrets / Compose will not start
+
+```bash
+# Required before the first `docker compose up`
+./scripts/generate_secrets.sh
+```
+
+Compose errors about `POSTGRES_PASSWORD`, `SECRET_KEY`, or `ADMIN_PASSWORD` mean `.env` is missing or a required value is empty. Known-insecure defaults (for example `admin123`) are rejected by the backend even if set.
 
 ### Port Already in Use
 

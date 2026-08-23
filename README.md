@@ -143,21 +143,34 @@ Use **Race Events** when you care about a particular race day or series.
 cd crew-bench
 ```
 
-2. Start the application with Docker Compose:
+2. Create secrets. **Required** — Compose will not start with missing or empty secrets, and the backend will not start with known-insecure defaults:
 
 ```bash
-docker-compose up --build
+./scripts/generate_secrets.sh
 ```
 
-3. Access the application:
-   - Frontend: http://localhost:3000
+This writes a gitignored `.env` with unique `POSTGRES_PASSWORD`, `SECRET_KEY`, and `ADMIN_PASSWORD`. Save the printed admin login. Alternatively, copy `.env.example` to `.env` and set those values yourself (do not leave them blank, and do not use values like `admin123` or `crewbench_secret`).
+
+3. Start the application with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+4. Access the application:
+   - Frontend: http://localhost:3333
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
 
-### Default Admin Account
+### Admin account
 
-- Email: `admin@crewbench.app`
-- Password: `admin123`
+The initial admin user is created from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your `.env`. There is no default password in the repository. The admin must change this password on first login.
+
+If you already have a Postgres data volume from an earlier password, either put that password in `.env` or reset the volume:
+
+```bash
+docker compose down -v
+```
 
 ## User Roles
 
@@ -265,22 +278,29 @@ Optional: set `PUBLIC_URL=http://localhost:3000` when starting the backend so re
 
 ## Environment Variables
 
-### Backend
-- `DATABASE_URL` - PostgreSQL connection string
-- `SECRET_KEY` - JWT secret key
-- `ADMIN_EMAIL` - Default admin email
-- `ADMIN_PASSWORD` - Default admin password
-- `RECAPTCHA_SECRET_KEY` - Optional. reCAPTCHA v2 secret key for registration CAPTCHA. If set, new users must pass CAPTCHA verification.
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Optional. Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS` - Optional. When `SMTP_HOST` is set, crew pool alert emails are sent via SMTP; otherwise they are logged (dev/test).
-- `CREW_POOL_ALERT_COOLDOWN_SECONDS` - Optional. Per-skipper cooldown between crew pool alert emails (default: 3600). Set to `0` to disable rate limiting.
-- `LOG_LEVEL` - Optional. Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO).
-- `LOG_FILE` - Optional. Path to log file; if set, logs are also written to a rotating file (see LOG_MAX_BYTES, LOG_BACKUP_COUNT).
-- `LOG_MAX_BYTES` - Optional. Max bytes per log file when using LOG_FILE (default: 5MB).
-- `LOG_BACKUP_COUNT` - Optional. Number of backup log files to keep (default: 3).
-- `PUBLIC_URL` - Optional. Public URL of the app (e.g. `https://app.example.com`). When set, this is logged at startup and included in request log lines so logs reflect the reverse-proxy URL.
-- `ROOT_PATH` - Optional. Root path when the API is served behind a reverse proxy at a sub-path (used for OpenAPI docs).
-- `CORS_ORIGINS` - Optional. Comma-separated list of allowed CORS origins. The origin derived from `PUBLIC_URL` is automatically allowed when set.
+Secrets are read from a project-root `.env` file (gitignored) or from the process environment. Copy `.env.example` to `.env` or run `./scripts/generate_secrets.sh`. Docker Compose interpolates `.env` automatically and **exits with an error** if required secrets are unset or empty.
+
+### Backend (required)
+- `POSTGRES_PASSWORD` - PostgreSQL password. Must be set before `docker compose up`. At least 12 characters; known defaults such as `crewbench_secret` are rejected.
+- `SECRET_KEY` - JWT signing key. At least 32 characters; placeholder values such as `your-secret-key-change-in-production` are rejected.
+- `ADMIN_EMAIL` - Initial admin email (created on first startup if missing).
+- `ADMIN_PASSWORD` - Initial admin password. At least 12 characters; `admin123` and other known defaults are rejected.
+- `DATABASE_URL` - PostgreSQL connection string. Set automatically by Compose from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`. When running the backend outside Compose, set `DATABASE_URL` or the `POSTGRES_*` variables.
+
+### Backend (optional)
+- `POSTGRES_USER` - PostgreSQL user (default: `crewbench`).
+- `POSTGRES_DB` - PostgreSQL database name (default: `crewbench`).
+- `RECAPTCHA_SECRET_KEY` - reCAPTCHA v2 secret key for registration CAPTCHA. If set, new users must pass CAPTCHA verification.
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS` - When `SMTP_HOST` is set, crew pool alert emails are sent via SMTP; otherwise they are logged (dev/test).
+- `CREW_POOL_ALERT_COOLDOWN_SECONDS` - Per-skipper cooldown between crew pool alert emails (default: 3600). Set to `0` to disable rate limiting.
+- `LOG_LEVEL` - Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO).
+- `LOG_FILE` - Path to log file; if set, logs are also written to a rotating file (see LOG_MAX_BYTES, LOG_BACKUP_COUNT).
+- `LOG_MAX_BYTES` - Max bytes per log file when using LOG_FILE (default: 5MB).
+- `LOG_BACKUP_COUNT` - Number of backup log files to keep (default: 3).
+- `PUBLIC_URL` - Public URL of the app (e.g. `https://app.example.com`). When set, this is logged at startup and included in request log lines so logs reflect the reverse-proxy URL.
+- `ROOT_PATH` - Root path when the API is served behind a reverse proxy at a sub-path (used for OpenAPI docs).
+- `CORS_ORIGINS` - Comma-separated list of allowed CORS origins. The origin derived from `PUBLIC_URL` is automatically allowed when set.
 
 ### Frontend
 - `REACT_APP_API_URL` - Backend base URL. Omit or set empty in production when the backend is on the same host (e.g. behind a reverse proxy at `/api`); the app will use relative `/api` requests. For local development without a proxy, defaults to `http://localhost:8000`.
