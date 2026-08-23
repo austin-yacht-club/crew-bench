@@ -14,9 +14,9 @@ Crew Bench is a web application that matches sailing crew with boats for racing 
 The browser must call `/api/...` for auth (e.g. `POST /api/auth/login`). In Docker this is controlled by runtime env **`API_BASE_PATH`** (default `/api`), written to `/config.js` on frontend container start — **no rebuild** to change it.
 
 - Preferred: reverse proxy sends all traffic to the frontend container; keep `API_BASE_PATH=/api`.
-- Login 404s: usually the SPA calling `/api/api` while the host expects `/api`. Run `./scripts/check_api_path.sh https://host` and fix `API_BASE_PATH` in `.env.prod`, then `./scripts/compose.sh prod up -d frontend`.
+- Login 404s: usually the SPA calling `/api/api` while the host expects `/api`, **or** `ROOT_PATH=/api` on the backend (FastAPI strips it and no routes match). Run `./scripts/check_api_path.sh https://host`. Fix `API_BASE_PATH` and ensure `ROOT_PATH` is unset, then `./scripts/compose.sh prod up -d frontend backend`.
 - Do **not** reintroduce bake-time `/api/api` defaults via `REACT_APP_API_URL`.
-
+- Do **not** set `ROOT_PATH=/api` in compose/env.
 ## Development Environment
 
 ### Two stacks
