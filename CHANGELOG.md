@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Messages of the day**: Admins can post a short MOTD for the landing page, login page, and the rest of the app. Each banner is prefixed with the date it was last saved. Signed-in users can dismiss a MOTD with an X; it reappears if the admin updates it.
 #### Separate debug and production stacks
 - **`docker-compose.dev.yml` / `docker-compose.prod.yml`**: `docker-compose.yml` is now a shared base paired with one environment overlay. Each overlay is its own Compose project (`crew-bench-dev` / `crew-bench-prod`) with its own host ports, database and volumes, so development never disturbs production.
 - **Ports**: production keeps frontend `3333`, API `8000`, Postgres `5432`; debug uses frontend `3334`, API `8001`, Postgres `5433`. All overridable via `PROD_*` / `DEV_*` variables.

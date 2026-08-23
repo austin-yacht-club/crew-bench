@@ -200,11 +200,18 @@ export const conversationsAPI = {
   sendMessage: (conversationId, body) => api.post(`/conversations/${conversationId}/messages`, { body }),
 };
 
+export const motdAPI = {
+  list: () => api.get('/motd'),
+  dismiss: (location) => api.post(`/motd/${location}/dismiss`),
+};
+
 export const adminAPI = {
   listUsers: () => api.get('/admin/users'),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   importCalendar: (url) => api.post('/admin/import-calendar', null, { params: { url } }),
   previewCalendar: (url) => api.get('/admin/calendar-preview', { params: { url } }),
+  listMotds: () => api.get('/admin/motd'),
+  updateMotd: (location, data) => api.put(`/admin/motd/${location}`, data),
 };
 
 export default api;

@@ -24,6 +24,7 @@ Crew Bench has **two complementary ways** to connect:
 - **In-app notifications**: Bell icon with unread count; list, mark read, and open linked pages
 - **Web Push (mobile web)**: Optional push notifications when crew requests are sent or responded to
 - **Admin Interface**: Create events manually or import from racing calendars
+- **Messages of the day**: Admins can post a short landing-page, login-page, and dashboard MOTD; each is shown with its update date, and signed-in users can dismiss it
 - **Calendar Import**: Import events from external sources like Austin Yacht Club
 
 ## Using Crew Bench
@@ -365,6 +366,12 @@ Columns with a scalar model default (for example `allow_email_contact`) are adde
 ### Admin
 - `GET /api/admin/users` - List all users
 - `POST /api/admin/import-calendar` - Import events from calendar URL
+- `GET /api/admin/motd` - List landing, login, and dashboard messages of the day
+- `PUT /api/admin/motd/{location}` - Create or update a MOTD (`landing`, `login`, or `dashboard`)
+
+### Messages of the day
+- `GET /api/motd` - Public MOTDs currently visible to the caller (omits messages a signed-in user has dismissed)
+- `POST /api/motd/{location}/dismiss` - Dismiss the current MOTD for the signed-in user
 
 ## Development
 

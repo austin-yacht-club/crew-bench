@@ -42,11 +42,38 @@ import {
   Add,
   Edit,
   Delete,
+  Campaign,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { eventsAPI, adminAPI } from '../services/api';
+import { useMotd } from '../services/MotdContext';
+
+const MOTD_FIELDS = [
+  {
+    location: 'landing',
+    title: 'Landing page',
+    description: 'Shown at the top of the public home page.',
+  },
+  {
+    location: 'login',
+    title: 'Login page',
+    description: 'Shown on the sign-in screen.',
+  },
+  {
+    location: 'dashboard',
+    title: 'Dashboard',
+    description: 'Shown across the rest of the app after visitors leave the home page.',
+  },
+];
+
+const emptyMotdForms = {
+  landing: { message: '', is_active: false, updated_at: null },
+  login: { message: '', is_active: false, updated_at: null },
+  dashboard: { message: '', is_active: false, updated_at: null },
+};
 
 const AdminPage = () => {
+  const { refreshMotds } = useMotd();
   const [tab, setTab] = useState(0);
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
@@ -83,9 +110,18 @@ const AdminPage = () => {
     must_change_password: false,
   });
 
+  const [motdForms, setMotdForms] = useState(emptyMotdForms);
+  const [motdSaving, setMotdSaving] = useState({});
+
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (tab === 3) {
+      loadMotds();
+    }
+  }, [tab]);
 
   const loadData = async () => {
     try {
@@ -99,6 +135,49 @@ const AdminPage = () => {
       setError('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMotds = async () => {
+    try {
+      const response = await adminAPI.listMotds();
+      const next = { ...emptyMotdForms };
+      (response.data || []).forEach((motd) => {
+        next[motd.location] = {
+          message: motd.message || '',
+          is_active: Boolean(motd.is_active),
+          updated_at: motd.updated_at || null,
+        };
+      });
+      setMotdForms(next);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load messages');
+    }
+  };
+
+  const handleSaveMotd = async (location) => {
+    setMotdSaving((prev) => ({ ...prev, [location]: true }));
+    setError('');
+    try {
+      const form = motdForms[location];
+      const response = await adminAPI.updateMotd(location, {
+        message: form.message,
+        is_active: form.is_active,
+      });
+      setMotdForms((prev) => ({
+        ...prev,
+        [location]: {
+          message: response.data.message || '',
+          is_active: Boolean(response.data.is_active),
+          updated_at: response.data.updated_at || null,
+        },
+      }));
+      setSuccess(`${MOTD_FIELDS.find((item) => item.location === location)?.title || 'Message'} saved`);
+      refreshMotds();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save message');
+    } finally {
+      setMotdSaving((prev) => ({ ...prev, [location]: false }));
     }
   };
 
@@ -234,7 +313,7 @@ const AdminPage = () => {
         Admin Dashboard
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-        Manage events, users, and import racing calendars
+        Manage events, users, messages of the day, and import racing calendars
       </Typography>
 
       {error && (
@@ -259,6 +338,7 @@ const AdminPage = () => {
         <Tab icon={<Event />} label="Events" iconPosition="start" />
         <Tab icon={<CloudDownload />} label="Import" iconPosition="start" />
         <Tab icon={<People />} label="Users" iconPosition="start" />
+        <Tab icon={<Campaign />} label="Messages" iconPosition="start" />
       </Tabs>
 
       {tab === 0 && (
@@ -476,6 +556,86 @@ const AdminPage = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {tab === 3 && (
+        <Grid container spacing={3}>
+          {MOTD_FIELDS.map((field) => {
+            const form = motdForms[field.location] || emptyMotdForms.landing;
+            return (
+              <Grid item xs={12} key={field.location}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {field.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {field.description} Typically a single line, shown with the date you last saved it.
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      label="Message"
+                      value={form.message}
+                      onChange={(e) =>
+                        setMotdForms((prev) => ({
+                          ...prev,
+                          [field.location]: {
+                            ...prev[field.location],
+                            message: e.target.value,
+                          },
+                        }))
+                      }
+                      inputProps={{ maxLength: 280 }}
+                      helperText={`${form.message.length}/280 characters`}
+                      sx={{ mb: 2 }}
+                    />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        alignItems: { sm: 'center' },
+                        justifyContent: 'space-between',
+                        gap: 2,
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={Boolean(form.is_active) && Boolean(form.message.trim())}
+                            onChange={(e) =>
+                              setMotdForms((prev) => ({
+                                ...prev,
+                                [field.location]: {
+                                  ...prev[field.location],
+                                  is_active: e.target.checked,
+                                },
+                              }))
+                            }
+                          />
+                        }
+                        label="Visible"
+                      />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {form.updated_at && (
+                          <Typography variant="caption" color="text.secondary">
+                            Last saved {format(new Date(form.updated_at), 'MMM d, yyyy h:mm a')}
+                          </Typography>
+                        )}
+                        <Button
+                          variant="contained"
+                          onClick={() => handleSaveMotd(field.location)}
+                          disabled={motdSaving[field.location]}
+                        >
+                          {motdSaving[field.location] ? 'Saving...' : 'Save'}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
       )}
 
       <Dialog open={eventDialogOpen} onClose={() => setEventDialogOpen(false)} maxWidth="sm" fullWidth>

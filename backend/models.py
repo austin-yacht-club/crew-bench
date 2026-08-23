@@ -337,3 +337,39 @@ class DirectMessage(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User")
+
+
+class MotdLocation(str, enum.Enum):
+    LANDING = "landing"
+    LOGIN = "login"
+    DASHBOARD = "dashboard"
+
+
+class Motd(Base):
+    """Admin-authored message of the day for a specific surface."""
+    __tablename__ = "motds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    location = Column(String, unique=True, nullable=False, index=True)
+    message = Column(String(280), nullable=False, default="")
+    is_active = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    updated_by = relationship("User")
+
+
+class MotdDismissal(Base):
+    """Per-user dismissal of a MOTD version (reappears when the MOTD is updated)."""
+    __tablename__ = "motd_dismissals"
+    __table_args__ = (
+        UniqueConstraint("user_id", "location", name="uq_motd_dismissal_user_location"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    location = Column(String, nullable=False, index=True)
+    dismissed_updated_at = Column(DateTime, nullable=False)
+    dismissed_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

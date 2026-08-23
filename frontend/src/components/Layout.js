@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 import NotificationBell from './NotificationBell';
+import MotdBanner from './MotdBanner';
 
 const drawerWidth = 260;
 
@@ -239,6 +240,9 @@ const Layout = () => {
           minWidth: 0,
         }}
       >
+        {location.pathname !== '/' && (
+          <MotdBanner location="dashboard" sx={{ mb: 2 }} />
+        )}
         <Outlet />
       </Box>
     </Box>
