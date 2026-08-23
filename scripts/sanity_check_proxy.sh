@@ -30,9 +30,11 @@ fi
 
 if [[ "$ENV_NAME" == "dev" ]]; then
   BACKEND_PORT="${DEV_BACKEND_PORT:-8001}"
+  FRONTEND_PORT="${DEV_FRONTEND_PORT:-3334}"
   DB_NAME="${DEV_POSTGRES_DB:-crewbench_dev}"
 else
   BACKEND_PORT="${PROD_BACKEND_PORT:-8000}"
+  FRONTEND_PORT="${PROD_FRONTEND_PORT:-3333}"
   DB_NAME="${PROD_POSTGRES_DB:-crewbench}"
 fi
 
@@ -86,3 +88,5 @@ else
 fi
 
 echo "=== All sanity checks passed. ==="
+echo "Tip: after the frontend is up, also run:"
+echo "  ./scripts/check_api_path.sh http://localhost:${FRONTEND_PORT}"

@@ -9,6 +9,14 @@ Crew Bench is a web application that matches sailing crew with boats for racing 
 - **Frontend**: React with Material-UI
 - **Infrastructure**: Docker Compose for local development
 
+### Reverse proxy / API path (do not regress)
+
+The browser must call `/api/...` for auth (e.g. `POST /api/auth/login`). In Docker this is controlled by runtime env **`API_BASE_PATH`** (default `/api`), written to `/config.js` on frontend container start — **no rebuild** to change it.
+
+- Preferred: reverse proxy sends all traffic to the frontend container; keep `API_BASE_PATH=/api`.
+- Login 404s: usually the SPA calling `/api/api` while the host expects `/api`. Run `./scripts/check_api_path.sh https://host` and fix `API_BASE_PATH` in `.env.prod`, then `./scripts/compose.sh prod up -d frontend`.
+- Do **not** reintroduce bake-time `/api/api` defaults via `REACT_APP_API_URL`.
+
 ## Development Environment
 
 ### Two stacks

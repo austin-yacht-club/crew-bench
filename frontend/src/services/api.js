@@ -1,14 +1,39 @@
 import axios from 'axios';
 
-// Empty or omitted = same-origin relative `/api` (matches README + host proxies that
-// forward `/api/*` to the backend without stripping). Frontend nginx also works:
-// it strips one `/api`, then RootPathRewriteMiddleware restores `/api/...`.
-// For a proxy that *strips* one `/api` before the backend, set REACT_APP_API_URL=/api
-// so the browser emits `/api/api/...` and the surviving path is `/api/...`.
-const API_URL = process.env.REACT_APP_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+/**
+ * Resolve the axios base URL.
+ *
+ * First-class (Docker / production): runtime `window.__CREW_BENCH_CONFIG__.apiBasePath`
+ * written by the frontend container from `API_BASE_PATH` on every start — no rebuild needed.
+ *   API_BASE_PATH=/api       default (host forwards /api to backend, or all traffic via frontend nginx)
+ *   API_BASE_PATH=/api/api   only when an outer proxy strips one /api before the backend
+ *
+ * Fallback (local CRA): REACT_APP_API_URL — empty → /api; unset in development → http://localhost:8000/api
+ */
+function resolveApiBaseURL() {
+  if (typeof window !== 'undefined') {
+    const runtime = window.__CREW_BENCH_CONFIG__?.apiBasePath;
+    if (typeof runtime === 'string' && runtime.trim()) {
+      return runtime.replace(/\/$/, '');
+    }
+  }
+
+  const env = process.env.REACT_APP_API_URL;
+  if (env !== undefined && env !== null) {
+    if (env === '') {
+      return '/api';
+    }
+    return `${env.replace(/\/$/, '')}/api`;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
+  }
+  return 'http://localhost:8000/api';
+}
 
 const api = axios.create({
-  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api',
+  baseURL: resolveApiBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
