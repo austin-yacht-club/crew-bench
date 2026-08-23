@@ -21,11 +21,12 @@ VALID_PASSWORD = "unique-test-admin-pw"
 VALID_DB_URL = "postgresql://crewbench:unique-db-password-ok@localhost:5432/crewbench"
 
 
-def test_secret_key_required():
+def test_secret_key_required(monkeypatch):
     with pytest.raises(SecretConfigError, match="SECRET_KEY is required"):
         get_secret_key("")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(SecretConfigError, match="SECRET_KEY is required"):
-        get_secret_key(None)
+        get_secret_key()
 
 
 @pytest.mark.parametrize(
