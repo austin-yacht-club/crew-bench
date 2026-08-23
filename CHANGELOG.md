@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Login/register 404 behind reverse proxy**: Empty `REACT_APP_API_URL` again uses same-origin `/api/...` instead of `/api/api/...`. Host proxies that forward `/api` to the backend without stripping were hitting non-existent `/api/api/auth/*` routes.
 - **Database startup**: The backend now exits with an actionable fatal error when PostgreSQL is unreachable, credentials do not match a persisted database, a schema patch fails, or an existing schema is missing a modeled table or column.
 - **Authentication errors**: Login and registration now show a service-unavailable message for backend/network failures and render API validation details safely.
 
@@ -75,7 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 #### Production frontend image and proxy compatibility
 - **Multi-stage Docker build**: React frontend now builds in a Node stage and is served by nginx from a minimal runtime image
 - **nginx /api proxy**: Frontend container proxies `/api` to the backend container, with `X-Forwarded-*` headers preserved for HTTPS-terminating proxies
-- **Cloudflare /api/api compatibility**: Frontend uses `/api/api` when `REACT_APP_API_URL` is empty so Cloudflare (or similar) that strips one `/api` still hits `/api/auth/login` on the backend
+- **Same-origin `/api` default**: Empty `REACT_APP_API_URL` uses relative `/api/...` (matches host proxies that forward `/api` to the backend without stripping). Set `REACT_APP_API_URL=/api` only when the outer proxy strips one `/api` prefix.
 
 #### Sanity tests
 - **backend/tests/test_proxy_sanity.py**: Pytest tests for health at subpath, OpenAPI, CORS (PUBLIC_URL and localhost), auth routes

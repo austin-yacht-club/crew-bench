@@ -430,18 +430,38 @@ Secrets are read from a project-root environment file (gitignored) or from the p
 - `CORS_ORIGINS` - Comma-separated list of allowed CORS origins. The origin derived from `PUBLIC_URL` is automatically allowed when set.
 
 ### Frontend
-- `REACT_APP_API_URL` - Backend base URL. Omit or set empty in production when the backend is on the same host (e.g. behind a reverse proxy at `/api`); the app will use relative `/api` requests. For local development without a proxy, defaults to `http://localhost:8000`.
+- `REACT_APP_API_URL` - Backend base URL baked into the frontend build.
+  - **Omit or leave empty** (recommended for same-host reverse proxies): the app calls relative `/api/...` (e.g. `https://yourapp.com/api/auth/login`).
+  - **Local CRA without a proxy**: defaults to `http://localhost:8000`.
+  - **Proxy that strips one `/api` before the backend**: set `REACT_APP_API_URL=/api` so the browser emits `/api/api/...` and the surviving path is `/api/...`.
 - `REACT_APP_RECAPTCHA_SITE_KEY` - Optional. reCAPTCHA v2 site key (must be set if backend uses `RECAPTCHA_SECRET_KEY`).
 
 ## Production behind a reverse proxy (e.g. Cloudflare Zero Trust)
 
 When you cannot use different ports and must serve the backend on a sub-path of the same host as the frontend:
 
-1. **Reverse proxy**: Route the same host so that path prefix `/api` is proxied to the backend (e.g. `https://yourapp.com/api/*` → `http://backend:8000/api/*`). Do not strip the path prefix so the backend receives paths like `/api/health`, `/api/auth/login`, etc.
+1. **Reverse proxy** (pick one):
+   - **Preferred**: send **all** traffic to the frontend container (`:3333` by default). Its nginx proxies `/api/` to the backend and the SPA is served from `/`.
+   - **Or** split paths: `/` → frontend, `/api/*` → backend **without stripping** the `/api` prefix (backend must receive `/api/health`, `/api/auth/login`, etc.).
 
 2. **Backend**: Set `PUBLIC_URL` to the public base URL (e.g. `https://yourapp.com`). Optionally set `CORS_ORIGINS` if you need additional origins. Request logs will show the public URL in each line.
 
-3. **Frontend**: Build with `REACT_APP_API_URL` empty (or unset) so API requests go to the same origin (e.g. `https://yourapp.com/api/...`). No separate backend port is needed.
+3. **Frontend**: Build with `REACT_APP_API_URL` empty (or unset) so the browser calls same-origin `/api/...`. Rebuild the frontend image after changing this env var.
+
+### Quick diagnosis (login/register 404)
+
+If the SPA loads but login/register return **404**, the browser is likely calling the wrong path:
+
+```bash
+# Should be healthy (200)
+curl -sS https://yourapp.com/api/health
+# Should be 401 (exists) — not 404
+curl -sS -o /dev/null -w "%{http_code}\n" https://yourapp.com/api/auth/me
+# Double prefix should NOT be required (expect 404)
+curl -sS -o /dev/null -w "%{http_code}\n" https://yourapp.com/api/api/auth/me
+```
+
+In the browser Network tab, login should be `POST /api/auth/login`. If you see `POST /api/api/auth/login` against a host proxy that forwards `/api` straight to the backend, rebuild with this fix (empty `REACT_APP_API_URL` → `/api`) or temporarily point all traffic at the frontend container.
 
 ### Sanity check before deployment
 

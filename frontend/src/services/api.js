@@ -1,10 +1,14 @@
 import axios from 'axios';
 
-// Empty or omitted = same-origin; use /api/api when proxy strips one /api before backend
+// Empty or omitted = same-origin relative `/api` (matches README + host proxies that
+// forward `/api/*` to the backend without stripping). Frontend nginx also works:
+// it strips one `/api`, then RootPathRewriteMiddleware restores `/api/...`.
+// For a proxy that *strips* one `/api` before the backend, set REACT_APP_API_URL=/api
+// so the browser emits `/api/api/...` and the surviving path is `/api/...`.
 const API_URL = process.env.REACT_APP_API_URL ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 const api = axios.create({
-  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api/api',
+  baseURL: API_URL ? `${API_URL.replace(/\/$/, '')}/api` : '/api',
   headers: {
     'Content-Type': 'application/json',
   },
