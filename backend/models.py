@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, Table
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -40,6 +40,10 @@ class ContactPreference(str, enum.Enum):
     PHONE = "phone"
     SMS = "sms"
     ANY = "any"
+
+
+class ConversationSource(str, enum.Enum):
+    CREW_POOL = "crew_pool"
 
 
 class User(Base):
@@ -298,3 +302,36 @@ class PushSubscription(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User")
+
+
+class Conversation(Base):
+    """Direct-message thread between a skipper and crew member."""
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("skipper_id", "crew_id", "source", name="uq_conversation_participants_source"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    skipper_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    crew_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    source = Column(String, default=ConversationSource.CREW_POOL.value, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    skipper = relationship("User", foreign_keys=[skipper_id])
+    crew = relationship("User", foreign_keys=[crew_id])
+    messages = relationship("DirectMessage", back_populates="conversation", order_by="DirectMessage.created_at")
+
+
+class DirectMessage(Base):
+    """A single in-app message within a conversation."""
+    __tablename__ = "direct_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User")

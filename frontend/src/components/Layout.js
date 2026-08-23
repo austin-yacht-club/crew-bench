@@ -33,6 +33,7 @@ import {
   Person as PersonIcon,
   ContactPage as ContactsIcon,
   Groups as GroupsIcon,
+  MailOutline as MailIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -74,6 +75,7 @@ const Layout = () => {
         { text: 'My Schedule', icon: <CalendarIcon />, path: '/status' },
         { text: 'My Boats', icon: <BoatIcon />, path: '/boats' },
         { text: 'Requests', icon: <InboxIcon />, path: '/requests' },
+        { text: 'Messages', icon: <MailIcon />, path: '/messages' },
         { text: 'Contacts', icon: <ContactsIcon />, path: '/contacts' },
       ],
     }] : []),

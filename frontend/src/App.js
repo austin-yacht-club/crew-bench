@@ -17,6 +17,7 @@ import RequestsPage from './pages/RequestsPage';
 import StatusPage from './pages/StatusPage';
 import AdminPage from './pages/AdminPage';
 import ContactsPage from './pages/ContactsPage';
+import MessagesPage from './pages/MessagesPage';
 
 const theme = createTheme({
   palette: {
@@ -164,6 +165,12 @@ function App() {
               } />
               <Route path="contacts" element={
                 <PrivateRoute><ContactsPage /></PrivateRoute>
+              } />
+              <Route path="messages" element={
+                <PrivateRoute><MessagesPage /></PrivateRoute>
+              } />
+              <Route path="messages/:conversationId" element={
+                <PrivateRoute><MessagesPage /></PrivateRoute>
               } />
               <Route path="admin" element={
                 <AdminRoute><AdminPage /></AdminRoute>
