@@ -19,6 +19,7 @@ class UserBase(BaseModel):
     allow_phone_contact: Optional[bool] = False
     allow_sms_contact: Optional[bool] = False
     contact_preference: Optional[str] = "email"
+    crew_pool_email_alerts: Optional[bool] = False
 
 
 class UserCreate(UserBase):
@@ -44,6 +45,7 @@ class UserUpdate(BaseModel):
     allow_phone_contact: Optional[bool] = None
     allow_sms_contact: Optional[bool] = None
     contact_preference: Optional[str] = None
+    crew_pool_email_alerts: Optional[bool] = None
 
 
 class AdminUserUpdate(UserUpdate):

@@ -26,7 +26,7 @@ import {
   DialogContent,
   DialogActions,
 } from '@mui/material';
-import { Person, Save, ContactMail, PhotoCamera, Delete, Lock, VpnKey } from '@mui/icons-material';
+import { Person, Save, ContactMail, PhotoCamera, Delete, Lock, VpnKey, Email } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 
 const ProfilePage = () => {
@@ -48,6 +48,7 @@ const ProfilePage = () => {
     allow_phone_contact: user?.allow_phone_contact ?? false,
     allow_sms_contact: user?.allow_sms_contact ?? false,
     contact_preference: user?.contact_preference || 'email',
+    crew_pool_email_alerts: user?.crew_pool_email_alerts ?? false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -479,6 +480,31 @@ const ProfilePage = () => {
                     </FormControl>
                   </Grid>
                 </Grid>
+
+                {(formData.role === 'skipper' || user?.role === 'skipper' || user?.is_admin) && (
+                  <>
+                    <Divider sx={{ my: 3 }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Email sx={{ mr: 1, color: 'primary.main' }} />
+                      <Typography variant="h6">Crew Pool Alerts</Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Get an email when crew join or re-activate in the Crew Pool (at most one alert per hour).
+                    </Typography>
+                    <FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.crew_pool_email_alerts}
+                            onChange={handleChange}
+                            name="crew_pool_email_alerts"
+                          />
+                        }
+                        label="Email me when new crew join the Crew Pool"
+                      />
+                    </FormGroup>
+                  </>
+                )}
 
                 <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap' }}>
                   <Button
