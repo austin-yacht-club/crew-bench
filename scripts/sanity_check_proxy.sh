@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # Sanity-check reverse-proxy / sub-path behavior before deployment.
-# Brings up db (+ optional backend), runs pytest with PUBLIC_URL set, then curls /api/health.
+# Brings up the debug stack's db and backend, runs pytest with PUBLIC_URL set,
+# then curls /api/health. Runs against crew-bench-dev so production is untouched.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -f "$ROOT_DIR/.env" ]]; then
+ENV_NAME="${CREW_BENCH_ENV:-dev}"
+COMPOSE=("$ROOT_DIR/scripts/compose.sh" "$ENV_NAME")
+ENV_FILE=".env.${ENV_NAME}"
+if [[ ! -f "$ENV_FILE" ]]; then
+  ENV_FILE=".env"
+fi
+
+if [[ -f "$ROOT_DIR/$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source "$ROOT_DIR/.env"
+  source "$ROOT_DIR/$ENV_FILE"
   set +a
 fi
 
@@ -20,16 +28,24 @@ if [[ -z "${POSTGRES_PASSWORD:-}" || -z "${SECRET_KEY:-}" || -z "${ADMIN_PASSWOR
   exit 1
 fi
 
+if [[ "$ENV_NAME" == "dev" ]]; then
+  BACKEND_PORT="${DEV_BACKEND_PORT:-8001}"
+  DB_NAME="${DEV_POSTGRES_DB:-crewbench_dev}"
+else
+  BACKEND_PORT="${PROD_BACKEND_PORT:-8000}"
+  DB_NAME="${PROD_POSTGRES_DB:-crewbench}"
+fi
+
 PUBLIC_URL="${PUBLIC_URL:-https://app.example.com}"
 
-echo "=== Sanity check: reverse-proxy / sub-path (PUBLIC_URL=$PUBLIC_URL) ==="
+echo "=== Sanity check: reverse-proxy / sub-path (stack=crew-bench-$ENV_NAME, PUBLIC_URL=$PUBLIC_URL) ==="
 
 # 1) Start DB (and backend so we can curl it at the end)
 echo "Starting db and backend..."
-docker-compose up -d db
+"${COMPOSE[@]}" up -d db
 echo "Waiting for Postgres..."
 for i in {1..30}; do
-  if docker-compose exec -T db pg_isready -U crewbench -q 2>/dev/null; then
+  if "${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER:-crewbench}" -d "$DB_NAME" -q 2>/dev/null; then
     break
   fi
   if [[ $i -eq 30 ]]; then
@@ -41,27 +57,27 @@ done
 
 # 2) Run pytest inside backend container (uses db from compose network)
 echo "Running proxy sanity tests (pytest)..."
-docker-compose run --rm -e PUBLIC_URL="$PUBLIC_URL" backend python3 -m pytest tests/test_proxy_sanity.py -v
+"${COMPOSE[@]}" run --rm -e PUBLIC_URL="$PUBLIC_URL" backend python3 -m pytest tests/test_proxy_sanity.py -v
 echo "Pytest passed."
 
 # 3) Start backend and hit /api/health
-docker-compose up -d backend
+"${COMPOSE[@]}" up -d backend
 echo "Waiting for backend..."
 for i in {1..30}; do
-  if curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
+  if curl -sf "http://localhost:${BACKEND_PORT}/api/health" >/dev/null 2>&1; then
     break
   fi
   if [[ $i -eq 30 ]]; then
     echo "Backend did not become ready in time."
-    docker-compose logs backend
+    "${COMPOSE[@]}" logs backend
     exit 1
   fi
   sleep 1
 done
 
 # 4) Curl health and assert
-echo "Curl /api/health..."
-HEALTH="$(curl -sf http://localhost:8000/api/health)"
+echo "Curl /api/health on port ${BACKEND_PORT}..."
+HEALTH="$(curl -sf "http://localhost:${BACKEND_PORT}/api/health")"
 if echo "$HEALTH" | grep -q '"status":"healthy"'; then
   echo "Health check OK: $HEALTH"
 else
