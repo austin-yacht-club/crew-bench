@@ -12,6 +12,9 @@ Crew Bench has **two complementary ways** to connect:
 ## Features
 
 - **Crew Pool**: Crew register general availability (weekends, Saturdays, date ranges, notes); skippers browse without picking an event
+- **Direct messaging**: Skippers can message crew from the Crew Pool; both parties see conversation history under Messages
+- **Invite from pool**: Skippers can invite Crew Pool members to a specific event or series (appears in Requests)
+- **Crew Pool email alerts**: Skippers can opt in to email when new crew join or re-activate in the pool
 - **User Registration**: Register as crew looking for boats or as a skipper with a boat
 - **Event Management**: Browse upcoming sailing events, races, and regattas
 - **Crew Availability**: Mark yourself available for specific events or an entire series
@@ -30,6 +33,10 @@ Crew Bench has **two complementary ways** to connect:
 Register as **crew** or **skipper**, then complete your profile (experience, weight, position preferences, contact prefs).
 
 ![Profile](docs/images/profile.png)
+
+**Crew Pool email alerts** (skippers): on Profile, enable **Email me when new crew join the Crew Pool**. Alerts fire when someone newly registers interest or re-activates a hidden profile (at most one email per hour by default). Without SMTP configured, emails are logged for local development.
+
+![Crew Pool email alerts preference](docs/images/profile_crew_pool_alerts.png)
 
 ### 2. Crew Pool — general interest (no event required)
 
@@ -53,6 +60,31 @@ Use **Crew Pool** when you want to crew generally, or when skippers want to find
 ![Crew Pool — Browse](docs/images/crew_pool_browse.png)
 
 You can hide your profile from skippers or remove it entirely at any time.
+
+**Message crew from the pool** (skippers):
+
+1. On **Browse Crew Pool**, click **Send message** on a crew card
+2. Compose a short note (contact preferences are respected)
+3. Continue the conversation under **Messages** in *My Account*
+
+![Send message from Crew Pool](docs/images/crew_pool_send_message.png)
+
+![Compose message dialog](docs/images/crew_pool_message_dialog.png)
+
+![Messages conversation](docs/images/messages_thread.png)
+
+**Invite pool crew to a race** (skippers):
+
+1. Add at least one boat under **My Boats**
+2. On **Browse Crew Pool**, click **Invite to event** on a crew card
+3. Choose your boat and an event (or invite for an entire series)
+4. The invitation appears in the crew member’s **Requests** inbox
+
+![Invite to event from Crew Pool](docs/images/crew_pool_invite_browse.png)
+
+![Invite dialog](docs/images/crew_pool_invite_dialog.png)
+
+![Invitation sent](docs/images/crew_pool_invite_success.png)
 
 ### 3. Race Events — specific races and series
 
@@ -88,7 +120,7 @@ Use **Race Events** when you care about a particular race day or series.
 |-------------------|----------------------------------------------|
 | **General Crew**  | Crew Pool (interest without a specific race) |
 | **Race Events**   | Browse Events, Find Crew for a race/series   |
-| **My Account**    | Schedule, boats, requests, contacts, profile |
+| **My Account**    | Schedule, boats, requests, messages, contacts, profile |
 
 ## Tech Stack
 
@@ -160,6 +192,12 @@ docker-compose up --build
 - `GET /api/crew-pool/my` - Get current user’s crew interest
 - `PUT /api/crew-pool` - Create or update crew interest
 - `DELETE /api/crew-pool` - Remove crew interest profile
+
+### Direct messaging
+- `POST /api/conversations` - Start a conversation from the Crew Pool
+- `GET /api/conversations` - List conversations
+- `GET /api/conversations/{id}` - Get conversation with messages
+- `POST /api/conversations/{id}/messages` - Send a reply
 
 ### Boats
 - `GET /api/boats` - List all boats
