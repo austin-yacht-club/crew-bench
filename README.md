@@ -12,6 +12,7 @@ Crew Bench has **two complementary ways** to connect:
 ## Features
 
 - **Crew Pool**: Crew register general availability (weekends, Saturdays, date ranges, notes); skippers browse without picking an event
+- **Direct messaging**: Skippers can message crew from the Crew Pool; both parties see conversation history under Messages
 - **User Registration**: Register as crew looking for boats or as a skipper with a boat
 - **Event Management**: Browse upcoming sailing events, races, and regattas
 - **Crew Availability**: Mark yourself available for specific events or an entire series
@@ -54,6 +55,18 @@ Use **Crew Pool** when you want to crew generally, or when skippers want to find
 
 You can hide your profile from skippers or remove it entirely at any time.
 
+**Message crew from the pool** (skippers):
+
+1. On **Browse Crew Pool**, open a crew card and click **Send message**
+2. Compose a short note (contact preferences are respected — e.g. preferred email)
+3. Continue the conversation under **Messages** in *My Account*
+
+![Send message from Crew Pool](docs/images/crew_pool_send_message.png)
+
+![Compose message dialog](docs/images/crew_pool_message_dialog.png)
+
+![Messages conversation](docs/images/messages_thread.png)
+
 ### 3. Race Events — specific races and series
 
 Use **Race Events** when you care about a particular race day or series.
@@ -88,7 +101,7 @@ Use **Race Events** when you care about a particular race day or series.
 |-------------------|----------------------------------------------|
 | **General Crew**  | Crew Pool (interest without a specific race) |
 | **Race Events**   | Browse Events, Find Crew for a race/series   |
-| **My Account**    | Schedule, boats, requests, contacts, profile |
+| **My Account**    | Schedule, boats, requests, messages, contacts, profile |
 
 ## Tech Stack
 
@@ -160,6 +173,12 @@ docker-compose up --build
 - `GET /api/crew-pool/my` - Get current user’s crew interest
 - `PUT /api/crew-pool` - Create or update crew interest
 - `DELETE /api/crew-pool` - Remove crew interest profile
+
+### Direct messaging
+- `POST /api/conversations` - Start a conversation from the Crew Pool
+- `GET /api/conversations` - List conversations
+- `GET /api/conversations/{id}` - Get conversation with messages
+- `POST /api/conversations/{id}/messages` - Send a reply
 
 ### Boats
 - `GET /api/boats` - List all boats
