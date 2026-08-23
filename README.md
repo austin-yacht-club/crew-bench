@@ -12,6 +12,7 @@ Crew Bench has **two complementary ways** to connect:
 ## Features
 
 - **Crew Pool**: Crew register general availability (weekends, Saturdays, date ranges, notes); skippers browse without picking an event
+- **Crew Pool email alerts**: Skippers can opt in to email when new crew join or re-activate in the pool
 - **User Registration**: Register as crew looking for boats or as a skipper with a boat
 - **Event Management**: Browse upcoming sailing events, races, and regattas
 - **Crew Availability**: Mark yourself available for specific events or an entire series
