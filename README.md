@@ -12,6 +12,7 @@ Crew Bench has **two complementary ways** to connect:
 ## Features
 
 - **Crew Pool**: Crew register general availability (weekends, Saturdays, date ranges, notes); skippers browse without picking an event
+- **Invite from pool**: Skippers can invite Crew Pool members to a specific event or series (appears in Requests)
 - **User Registration**: Register as crew looking for boats or as a skipper with a boat
 - **Event Management**: Browse upcoming sailing events, races, and regattas
 - **Crew Availability**: Mark yourself available for specific events or an entire series
@@ -53,6 +54,21 @@ Use **Crew Pool** when you want to crew generally, or when skippers want to find
 ![Crew Pool — Browse](docs/images/crew_pool_browse.png)
 
 You can hide your profile from skippers or remove it entirely at any time.
+
+**Invite pool crew to a race** (skippers):
+
+1. Add at least one boat under **My Boats**
+2. On **Browse Crew Pool**, click **Invite to event** on a crew card
+3. Choose your boat and an event (or invite for an entire series)
+4. The invitation appears in the crew member’s **Requests** inbox
+
+Badges on pool cards show general pool interest and whether someone also marked specific upcoming events.
+
+![Invite to event from Crew Pool](docs/images/crew_pool_invite_browse.png)
+
+![Invite dialog](docs/images/crew_pool_invite_dialog.png)
+
+![Invitation sent](docs/images/crew_pool_invite_success.png)
 
 ### 3. Race Events — specific races and series
 
