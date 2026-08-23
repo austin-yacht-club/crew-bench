@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Messages of the day**: Admins can post a short MOTD for the landing page, login page, and the rest of the app. Each banner is prefixed with the date it was last saved. Signed-in users can dismiss a MOTD with an X; it reappears if the admin updates it.
+
 ### Fixed
 
 - **Database startup**: The backend now exits with an actionable fatal error when PostgreSQL is unreachable, credentials do not match a persisted database, a schema patch fails, or an existing schema is missing a modeled table or column.

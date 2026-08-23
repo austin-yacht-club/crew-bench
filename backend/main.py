@@ -24,7 +24,7 @@ logger = configure_logging("crew_bench")
 ROOT_PATH = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
 PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
 CORS_ORIGINS_ENV = (os.getenv("CORS_ORIGINS") or "").strip()
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat, CrewInterest, Conversation, DirectMessage, ConversationSource
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat, CrewInterest, Conversation, DirectMessage, ConversationSource, Motd, MotdDismissal, MotdLocation
 import schemas
 from auth import (
     get_password_hash,
@@ -33,6 +33,7 @@ from auth import (
     create_access_token,
     get_current_active_user,
     get_admin_user,
+    get_optional_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_preview
@@ -107,7 +108,7 @@ _API_PATH_PREFIXES = (
     "auth/", "auth", "health",
     "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
     "availability", "crew-pool", "conversations", "contacts", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
-    "admin/", "admin", "favorite-boats",
+    "admin/", "admin", "favorite-boats", "motd",
 )
 _API_PREFIX = "/api"
 
@@ -2053,6 +2054,151 @@ async def preview_calendar(
     current_user: User = Depends(get_admin_user)
 ):
     return await fetch_calendar_preview(url)
+
+
+MOTD_LOCATIONS = (
+    MotdLocation.LANDING.value,
+    MotdLocation.LOGIN.value,
+    MotdLocation.DASHBOARD.value,
+)
+
+
+def _motd_is_visible(motd: Motd, user: Optional[User], db: Session) -> bool:
+    if not motd or not motd.is_active or not (motd.message or "").strip():
+        return False
+    if user is None:
+        return True
+    dismissal = (
+        db.query(MotdDismissal)
+        .filter(
+            MotdDismissal.user_id == user.id,
+            MotdDismissal.location == motd.location,
+        )
+        .first()
+    )
+    if (
+        dismissal
+        and motd.updated_at
+        and dismissal.dismissed_updated_at >= motd.updated_at
+    ):
+        return False
+    return True
+
+
+def _motd_public(motd: Motd) -> schemas.MotdPublic:
+    return schemas.MotdPublic(
+        location=motd.location,
+        message=motd.message,
+        updated_at=motd.updated_at,
+    )
+
+
+def _motd_admin_payload(location: str, motd: Optional[Motd]) -> schemas.MotdAdmin:
+    if motd is None:
+        return schemas.MotdAdmin(
+            location=location,
+            message="",
+            is_active=False,
+            updated_at=None,
+        )
+    return schemas.MotdAdmin(
+        location=motd.location,
+        message=motd.message or "",
+        is_active=bool(motd.is_active),
+        updated_at=motd.updated_at,
+    )
+
+
+@app.get("/api/motd", response_model=schemas.MotdMap)
+def get_motds(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    rows = {
+        row.location: row
+        for row in db.query(Motd).filter(Motd.location.in_(MOTD_LOCATIONS)).all()
+    }
+    payload = {}
+    for location in MOTD_LOCATIONS:
+        motd = rows.get(location)
+        payload[location] = _motd_public(motd) if _motd_is_visible(motd, current_user, db) else None
+    return payload
+
+
+@app.post("/api/motd/{location}/dismiss")
+def dismiss_motd(
+    location: MotdLocation,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    motd = db.query(Motd).filter(Motd.location == location.value).first()
+    if not motd or not motd.is_active or not (motd.message or "").strip():
+        raise HTTPException(status_code=404, detail="No active message to dismiss")
+    existing = (
+        db.query(MotdDismissal)
+        .filter(
+            MotdDismissal.user_id == current_user.id,
+            MotdDismissal.location == location.value,
+        )
+        .first()
+    )
+    now = datetime.utcnow()
+    if existing:
+        existing.dismissed_updated_at = motd.updated_at
+        existing.dismissed_at = now
+    else:
+        db.add(
+            MotdDismissal(
+                user_id=current_user.id,
+                location=location.value,
+                dismissed_updated_at=motd.updated_at,
+                dismissed_at=now,
+            )
+        )
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/admin/motd", response_model=List[schemas.MotdAdmin])
+def admin_list_motds(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+):
+    rows = {
+        row.location: row
+        for row in db.query(Motd).filter(Motd.location.in_(MOTD_LOCATIONS)).all()
+    }
+    return [_motd_admin_payload(location, rows.get(location)) for location in MOTD_LOCATIONS]
+
+
+@app.put("/api/admin/motd/{location}", response_model=schemas.MotdAdmin)
+def admin_update_motd(
+    location: MotdLocation,
+    payload: schemas.MotdUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user),
+):
+    message = payload.message or ""
+    is_active = bool(payload.is_active) and bool(message)
+    now = datetime.utcnow()
+    motd = db.query(Motd).filter(Motd.location == location.value).first()
+    if motd is None:
+        motd = Motd(
+            location=location.value,
+            message=message,
+            is_active=is_active,
+            updated_at=now,
+            updated_by_id=current_user.id,
+        )
+        db.add(motd)
+    else:
+        motd.message = message
+        motd.is_active = is_active
+        motd.updated_at = now
+        motd.updated_by_id = current_user.id
+    db.commit()
+    db.refresh(motd)
+    return _motd_admin_payload(location.value, motd)
 
 
 # Health check

@@ -14,6 +14,7 @@ import {
 import { Sailing } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
 import { getAPIErrorMessage } from '../services/api';
+import MotdBanner from '../components/MotdBanner';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -47,11 +48,12 @@ const LoginPage = () => {
       sx={{
         minHeight: '100vh',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         background: 'linear-gradient(135deg, #1565c0 0%, #00838f 100%)',
       }}
     >
-      <Container maxWidth="sm">
+      <MotdBanner location="login" sx={{ borderRadius: 0 }} />
+      <Container maxWidth="sm" sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
         <Card sx={{ p: { xs: 1, sm: 2 } }}>
           <CardContent>
             <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>

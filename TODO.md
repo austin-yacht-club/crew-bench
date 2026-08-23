@@ -71,6 +71,9 @@ This document tracks planned features, improvements, and known issues.
 - [x] Contacts: view users connected via crew requests; view their profile; view profile from My Schedule and Requests (shared ContactProfileDialog)
 - [x] Profile picture in app bar and Find Crew thumbnails; fix duplicate received request when no series
 
+### v1.8.0 Additions
+- [x] Admin MOTD banners for the landing page, login page, and dashboard (date-prefixed, dismissible when signed in)
+
 ---
 
 ## Planned Features

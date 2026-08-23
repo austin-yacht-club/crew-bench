@@ -16,6 +16,7 @@ import {
   DirectionsBoat,
 } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import MotdBanner from '../components/MotdBanner';
 
 const FeatureCard = ({ icon, title, description }) => (
   <Card sx={{ height: '100%', textAlign: 'center', p: 2 }}>
@@ -39,6 +40,7 @@ const HomePage = () => {
 
   return (
     <Box>
+      <MotdBanner location="landing" sx={{ mb: 2 }} />
       <Box
         sx={{
           background: 'linear-gradient(135deg, #1565c0 0%, #00838f 100%)',

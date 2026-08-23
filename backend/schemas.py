@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional, List
-from models import UserRole, ExperienceLevel, RequestStatus
+from models import UserRole, ExperienceLevel, RequestStatus, MotdLocation
 
 
 class UserBase(BaseModel):
@@ -448,6 +448,41 @@ class DirectMessage(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MotdPublic(BaseModel):
+    location: str
+    message: str
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MotdMap(BaseModel):
+    landing: Optional[MotdPublic] = None
+    login: Optional[MotdPublic] = None
+    dashboard: Optional[MotdPublic] = None
+
+
+class MotdAdmin(BaseModel):
+    location: str
+    message: str
+    is_active: bool
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MotdUpdate(BaseModel):
+    message: str = Field("", max_length=280)
+    is_active: bool = True
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        return " ".join((value or "").split())
 
 
 class ConversationCreate(BaseModel):
