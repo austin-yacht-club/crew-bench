@@ -2,17 +2,93 @@
 
 A web application for matching sailing crew to boats for racing events.
 
+Crew Bench has **two complementary ways** to connect:
+
+1. **Crew Pool** — general interest in crewing (no specific race required)
+2. **Race Events** — availability and invitations for particular races and series
+
+![Home page](docs/images/home.png)
+
 ## Features
 
+- **Crew Pool**: Crew register general availability (weekends, Saturdays, date ranges, notes); skippers browse without picking an event
 - **User Registration**: Register as crew looking for boats or as a skipper with a boat
 - **Event Management**: Browse upcoming sailing events, races, and regattas
-- **Crew Availability**: Crew members can mark themselves as available for specific events
-- **Crew Matching**: Skippers can browse available crew and send invitations
-- **Request Management**: Accept or decline crew requests
+- **Crew Availability**: Mark yourself available for specific events or an entire series
+- **Crew Matching**: Skippers browse available crew for an event and send invitations
+- **Request Management**: Accept or decline crew requests (including waitlists)
+- **My Schedule**: See confirmed assignments as crew or skipper
 - **In-app notifications**: Bell icon with unread count; list, mark read, and open linked pages
 - **Web Push (mobile web)**: Optional push notifications when crew requests are sent or responded to
 - **Admin Interface**: Create events manually or import from racing calendars
 - **Calendar Import**: Import events from external sources like Austin Yacht Club
+
+## Using Crew Bench
+
+### 1. Create a profile
+
+Register as **crew** or **skipper**, then complete your profile (experience, weight, position preferences, contact prefs).
+
+![Profile](docs/images/profile.png)
+
+### 2. Crew Pool — general interest (no event required)
+
+Use **Crew Pool** when you want to crew generally, or when skippers want to find people without selecting a race first.
+
+**Register Interest** (crew):
+
+1. Open **Crew Pool** in the sidebar under *General Crew*
+2. On **Register Interest**, tap shortcuts such as *Every Saturday*, *Every Weekend*, *Weekdays*, or *Flexible*
+3. Optionally add notes and specific date ranges
+4. Click **Register interest** / **Update profile**
+
+![Crew Pool — Register Interest](docs/images/crew_pool_register.png)
+
+**Browse Crew Pool** (skippers):
+
+1. Open the **Browse Crew Pool** tab
+2. Search by name, experience, or notes
+3. View availability shortcuts, date ranges, and notes for each person
+
+![Crew Pool — Browse](docs/images/crew_pool_browse.png)
+
+You can hide your profile from skippers or remove it entirely at any time.
+
+### 3. Race Events — specific races and series
+
+Use **Race Events** when you care about a particular race day or series.
+
+**Mark availability** (crew):
+
+1. Open **Browse Events** under *Race Events*
+2. Find an event (or a series) and mark yourself available
+3. Optionally prefer any boat, specific boats, or fleets
+
+![Race Events](docs/images/race_events.png)
+
+**Find crew for an event** (skippers):
+
+1. Open **Find Crew (Events)**
+2. Select an event (or series) and your boat
+3. Browse crew who marked availability for that event and send a request
+
+![Find Crew for Events](docs/images/find_crew_events.png)
+
+### 4. Requests and schedule
+
+- **Requests** — accept, decline, or manage waitlisted invitations  
+![Requests](docs/images/requests.png)
+
+- **My Schedule** — see what you’re sailing (as crew or on your own boat)  
+![My Schedule](docs/images/my_schedule.png)
+
+### Navigation overview
+
+| Sidebar section   | Purpose                                      |
+|-------------------|----------------------------------------------|
+| **General Crew**  | Crew Pool (interest without a specific race) |
+| **Race Events**   | Browse Events, Find Crew for a race/series   |
+| **My Account**    | Schedule, boats, requests, contacts, profile |
 
 ## Tech Stack
 
@@ -54,13 +130,15 @@ docker-compose up --build
 ## User Roles
 
 ### Crew
-- Browse events and mark availability
+- Register general interest in the Crew Pool (shortcuts, notes, date ranges)
+- Browse events and mark availability for specific races/series
 - Receive and respond to crew requests from skippers
 - Manage profile with experience level and certifications
 
 ### Skipper
 - Register boats with details (make, model, crew needed)
-- Browse available crew for events
+- Browse the Crew Pool for generally available crew
+- Browse available crew for specific events and send invitations
 - Send crew requests
 
 ### Admin
@@ -76,6 +154,12 @@ docker-compose up --build
 - `POST /api/auth/login` - Login and get token
 - `GET /api/auth/me` - Get current user
 - `PUT /api/auth/me` - Update current user
+
+### Crew Pool
+- `GET /api/crew-pool` - List active crew interest profiles
+- `GET /api/crew-pool/my` - Get current user’s crew interest
+- `PUT /api/crew-pool` - Create or update crew interest
+- `DELETE /api/crew-pool` - Remove crew interest profile
 
 ### Boats
 - `GET /api/boats` - List all boats
