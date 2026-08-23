@@ -51,6 +51,12 @@ if [[ "$SOURCE_PG_VERSION" != "15" ]]; then
   exit 1
 fi
 
+if docker compose ls --filter name="crew-bench-${ENV_NAME}" 2>/dev/null | grep -q running; then
+  echo "error: the crew-bench-${ENV_NAME} stack is running. Stop it first:" >&2
+  echo "  ./scripts/compose.sh $ENV_NAME down" >&2
+  exit 1
+fi
+
 if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
   if [[ -n "$(docker run --rm -v "$VOLUME":/target alpine:3.19 sh -c 'ls -A /target')" ]]; then
     echo "error: volume $VOLUME already contains data; refusing to overwrite." >&2
@@ -59,12 +65,6 @@ if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
   fi
 else
   docker volume create "$VOLUME" >/dev/null
-fi
-
-if docker compose ls --filter name="crew-bench-${ENV_NAME}" 2>/dev/null | grep -q running; then
-  echo "error: the crew-bench-${ENV_NAME} stack is running. Stop it first:" >&2
-  echo "  ./scripts/compose.sh $ENV_NAME down" >&2
-  exit 1
 fi
 
 echo "Copying data (this preserves ownership and permissions)..."
