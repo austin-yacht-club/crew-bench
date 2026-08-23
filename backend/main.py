@@ -14,7 +14,8 @@ from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
-from database import engine, get_db, Base
+from database import engine, get_db, Base, ensure_schema_updates
+from crew_pool_notifications import notify_skippers_of_crew_pool_activity
 from log_config import configure_logging
 
 logger = configure_logging("crew_bench")
@@ -38,6 +39,7 @@ from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_
 import httpx
 
 Base.metadata.create_all(bind=engine)
+ensure_schema_updates()
 
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 
@@ -928,6 +930,8 @@ def upsert_crew_interest(
     patterns = _serialize_patterns(data.patterns)
     date_ranges = _serialize_date_ranges(data.date_ranges)
     is_active = data.is_active if data.is_active is not None else True
+    was_active = interest.is_active if interest else False
+    is_new = interest is None
 
     if interest:
         interest.notes = data.notes
@@ -944,6 +948,17 @@ def upsert_crew_interest(
             is_active=is_active,
         )
         db.add(interest)
+
+    db.flush()
+    interest.crew = current_user
+
+    should_notify = is_active and (is_new or (not was_active and is_active))
+    if should_notify:
+        notify_skippers_of_crew_pool_activity(
+            db,
+            interest,
+            is_reactivation=not is_new,
+        )
 
     db.commit()
     db.refresh(interest)

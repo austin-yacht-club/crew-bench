@@ -61,6 +61,8 @@ class User(Base):
     allow_phone_contact = Column(Boolean, default=False)
     allow_sms_contact = Column(Boolean, default=False)
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
+    crew_pool_email_alerts = Column(Boolean, default=False)
+    last_crew_pool_alert_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     must_change_password = Column(Boolean, default=False)
