@@ -68,7 +68,7 @@ else
   exit 1
 fi
 
-# Prefer the Compose plugin; fall back to the standalone docker-compose binary.
+# Prefer the Compose plugin; fall back to a standalone docker-compose binary.
 if docker compose version >/dev/null 2>&1; then
   COMPOSE=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -77,6 +77,17 @@ else
   echo "error: neither 'docker compose' nor 'docker-compose' is available." >&2
   exit 1
 fi
+
+# Compose v1 cannot read the top-level `name:` key these overlays rely on, and
+# would silently fall back to the directory name for the project.
+COMPOSE_VERSION="$("${COMPOSE[@]}" version --short 2>/dev/null || true)"
+case "$COMPOSE_VERSION" in
+  v2.* | 2.* | v[3-9].* | [3-9].*) ;;
+  *)
+    echo "error: Docker Compose v2 or newer is required (found '${COMPOSE_VERSION:-unknown}')." >&2
+    exit 1
+    ;;
+esac
 
 echo "==> crew-bench-${ENV_NAME} (env file: ${ENV_FILE})" >&2
 exec "${COMPOSE[@]}" \

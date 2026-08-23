@@ -76,7 +76,7 @@ docker run --rm \
 echo
 echo "Done. Start the stack and let the backend reconcile the schema:"
 echo "  ./scripts/compose.sh $ENV_NAME up -d --build"
-echo "  ./scripts/compose.sh $ENV_NAME exec backend python manage_schema.py check"
+echo "  ./scripts/check_schema.sh $ENV_NAME check"
 echo
 echo "$SOURCE_DIR was not modified. Keep it until you have confirmed the stack"
 echo "works, then remove it (it is no longer used)."

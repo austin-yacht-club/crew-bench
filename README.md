@@ -133,7 +133,19 @@ Use **Race Events** when you care about a particular race day or series.
 
 ### Prerequisites
 
-- Docker and Docker Compose installed
+- Docker, and Docker Compose v2 as the `docker compose` plugin
+- Compose v2.22 or newer if you want `--watch` for live code changes in the debug stack (`docker compose version` to check)
+
+### Already running an older version?
+
+Two things changed that affect existing installations, so read this before starting:
+
+- **Postgres data moved out of `./db` into a named volume.** If a `./db` directory exists in your checkout, that is your database, and starting a stack now would quietly create an empty one beside it. Moving it is a one-time manual step that startup does **not** do for you: [Migrating from the old `./db` bind mount](#migrating-from-the-old-db-bind-mount).
+- **`docker compose up` on its own no longer starts the application.** `docker-compose.yml` is a shared base that publishes no ports; every start goes through `./scripts/compose.sh <dev|prod>` or names both files explicitly. Update any deploy script, systemd unit, or runbook that calls `docker compose up` or `docker-compose up` directly.
+
+No `./db` directory means nothing to migrate — follow the steps below as normal.
+
+Note the two unrelated things called "migration" here: moving the data directory into a volume is a manual step you run once, while bringing an old *schema* up to date happens automatically on every start ([Database schema updates](#database-schema-updates)).
 
 ### Running the Application
 
@@ -151,12 +163,14 @@ cd crew-bench
 
 This writes a gitignored `.env` with unique `POSTGRES_PASSWORD`, `SECRET_KEY`, and `ADMIN_PASSWORD`. Save the printed admin login. Alternatively, copy `.env.example` to `.env` and set those values yourself (do not leave them blank, and do not use values like `admin123` or `crewbench_secret`).
 
-3. Start a stack:
+3. Start a stack. There is no default stack, so name the one you want:
 
 ```bash
 ./scripts/compose.sh prod up -d --build   # production
 ./scripts/compose.sh dev  up -d --build   # debug/development
 ```
+
+The wrapper takes any `docker compose` arguments after the stack name and picks the right overlay, project name and environment file for you.
 
 4. Access the application:
 
@@ -248,15 +262,18 @@ Back up a database without stopping the stack:
 
 ### Migrating from the old `./db` bind mount
 
-Earlier versions stored PostgreSQL data in a `./db` directory inside the repository. To move an existing database into the named volume:
+Earlier versions stored PostgreSQL data in a `./db` directory inside the repository. If that directory exists, migrate it before starting a stack — otherwise the stack comes up on an empty volume and your data stays behind in `./db`, untouched but unused.
 
 ```bash
-./scripts/compose.sh prod down                 # stop the stack
+./scripts/compose.sh prod down                 # stop the stack, if it is running
 ./scripts/migrate_db_to_volume.sh prod         # ./db -> crew-bench-prod-db-data
 ./scripts/compose.sh prod up -d --build
+./scripts/check_schema.sh prod check           # confirm the schema matches the models
 ```
 
-The script only reads `./db`, refuses to overwrite a non-empty volume, and refuses to copy a data directory written by a different PostgreSQL major version (dump and restore instead). Delete `./db` once the stack is confirmed working.
+The script only reads `./db`. It refuses to run while the stack is up, to overwrite a non-empty volume, or to copy a data directory written by a different PostgreSQL major version (dump and restore instead). Delete `./db` once the stack is confirmed working.
+
+A database carried forward this way is usually also behind on schema, since it was created by an older release. Startup brings it up to date automatically — see [Database schema updates](#database-schema-updates).
 
 Note that `docker compose down -v` never deleted the old bind-mount directory, so a "full reset" left the previous database in place. With named volumes, `down -v` really does delete the data.
 
@@ -385,10 +402,10 @@ Optional: set `PUBLIC_URL=http://localhost:3000` when starting the backend so re
 
 ## Environment Variables
 
-Secrets are read from a project-root `.env` file (gitignored) or from the process environment. Copy `.env.example` to `.env` or run `./scripts/generate_secrets.sh`. Docker Compose interpolates `.env` automatically and **exits with an error** if required secrets are unset or empty.
+Secrets are read from a project-root environment file (gitignored) or from the process environment. Copy `.env.example` to `.env` or run `./scripts/generate_secrets.sh`. `compose.sh` passes `.env.<stack>` when it exists and `.env` otherwise; Compose interpolates that file and **exits with an error** if required secrets are unset or empty.
 
 ### Backend (required)
-- `POSTGRES_PASSWORD` - PostgreSQL password. Must be set before `docker compose up`. At least 12 characters; known defaults such as `crewbench_secret` are rejected.
+- `POSTGRES_PASSWORD` - PostgreSQL password. Must be set before starting a stack. At least 12 characters; known defaults such as `crewbench_secret` are rejected.
 - `SECRET_KEY` - JWT signing key. At least 32 characters; placeholder values such as `your-secret-key-change-in-production` are rejected.
 - `ADMIN_EMAIL` - Initial admin email (created on first startup if missing).
 - `ADMIN_PASSWORD` - Initial admin password. At least 12 characters; `admin123` and other known defaults are rejected.
