@@ -179,10 +179,10 @@ const FindCrewPage = () => {
   return (
     <Box>
       <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
-        Find Crew
+        Find Crew for Events
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-        Browse available crew for your upcoming events
+        Browse crew who marked availability for a specific race or series. For general crew interest, see Crew Pool.
       </Typography>
 
       {error && (

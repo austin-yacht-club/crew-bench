@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import CrewPoolPage from './pages/CrewPoolPage';
 import EventsPage from './pages/EventsPage';
 import BoatsPage from './pages/BoatsPage';
 import ProfilePage from './pages/ProfilePage';
@@ -16,6 +17,7 @@ import RequestsPage from './pages/RequestsPage';
 import StatusPage from './pages/StatusPage';
 import AdminPage from './pages/AdminPage';
 import ContactsPage from './pages/ContactsPage';
+import MessagesPage from './pages/MessagesPage';
 
 const theme = createTheme({
   palette: {
@@ -142,6 +144,9 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
+              <Route path="crew-pool" element={
+                <PrivateRoute><CrewPoolPage /></PrivateRoute>
+              } />
               <Route path="events" element={<EventsPage />} />
               <Route path="boats" element={
                 <PrivateRoute><BoatsPage /></PrivateRoute>
@@ -160,6 +165,12 @@ function App() {
               } />
               <Route path="contacts" element={
                 <PrivateRoute><ContactsPage /></PrivateRoute>
+              } />
+              <Route path="messages" element={
+                <PrivateRoute><MessagesPage /></PrivateRoute>
+              } />
+              <Route path="messages/:conversationId" element={
+                <PrivateRoute><MessagesPage /></PrivateRoute>
               } />
               <Route path="admin" element={
                 <AdminRoute><AdminPage /></AdminRoute>

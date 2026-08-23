@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import json
 from datetime import datetime, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -11,9 +12,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
-from database import engine, get_db, Base
+from database import engine, get_db, Base, ensure_schema_updates
+from crew_pool_notifications import notify_skippers_of_crew_pool_activity
 from log_config import configure_logging
 
 logger = configure_logging("crew_bench")
@@ -22,7 +24,7 @@ logger = configure_logging("crew_bench")
 ROOT_PATH = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
 PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
 CORS_ORIGINS_ENV = (os.getenv("CORS_ORIGINS") or "").strip()
-from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat
+from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat, CrewInterest, Conversation, DirectMessage, ConversationSource
 import schemas
 from auth import (
     get_password_hash,
@@ -37,6 +39,7 @@ from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_
 import httpx
 
 Base.metadata.create_all(bind=engine)
+ensure_schema_updates()
 
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 
@@ -100,7 +103,7 @@ app.add_middleware(
 _API_PATH_PREFIXES = (
     "auth/", "auth", "health",
     "boats", "events", "notifications", "push-subscriptions", "fleets", "series",
-    "availability", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
+    "availability", "crew-pool", "conversations", "contacts", "crew-requests", "skipper-commitments", "crew-ratings", "boat-ratings",
     "admin/", "admin", "favorite-boats",
 )
 _API_PREFIX = "/api"
@@ -225,6 +228,78 @@ def _create_notification_and_push(
         except Exception as e:
             logger.warning("Web Push send failed: %s", e)
     return notification
+
+
+def _filter_contact_fields(user: User) -> dict:
+    """Return user profile dict with contact fields filtered by preferences."""
+    return {
+        "id": user.id,
+        "name": user.name,
+        "role": user.role,
+        "experience_level": user.experience_level,
+        "bio": user.bio,
+        "weight": user.weight,
+        "certifications": user.certifications,
+        "position_preferences": user.position_preferences,
+        "profile_picture": user.profile_picture,
+        "allow_email_contact": user.allow_email_contact,
+        "allow_phone_contact": user.allow_phone_contact,
+        "allow_sms_contact": user.allow_sms_contact,
+        "contact_preference": user.contact_preference,
+        "preferred_contact_method": user.contact_preference,
+        "email": user.email if user.allow_email_contact else None,
+        "phone": user.phone if (user.allow_phone_contact or user.allow_sms_contact) else None,
+    }
+
+
+def _get_conversation_partner_ids(db: Session, user_id: int) -> List[int]:
+    """Return user IDs from crew-pool conversations involving user_id."""
+    rows = (
+        db.query(Conversation.skipper_id, Conversation.crew_id)
+        .filter(or_(Conversation.skipper_id == user_id, Conversation.crew_id == user_id))
+        .all()
+    )
+    partner_ids = set()
+    for skipper_id, crew_id in rows:
+        partner = crew_id if skipper_id == user_id else skipper_id
+        if partner and partner != user_id:
+            partner_ids.add(partner)
+    return list(partner_ids)
+
+
+def _conversation_for_user(db: Session, conversation_id: int, user_id: int) -> Optional[Conversation]:
+    return (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            or_(Conversation.skipper_id == user_id, Conversation.crew_id == user_id),
+        )
+        .first()
+    )
+
+
+def _conversation_to_schema(conversation: Conversation, current_user_id: int) -> schemas.Conversation:
+    messages = conversation.messages or []
+    last_message = messages[-1] if messages else None
+    last_own = max((m.created_at for m in messages if m.sender_id == current_user_id), default=None)
+    if last_own:
+        unread_count = sum(1 for m in messages if m.sender_id != current_user_id and m.created_at > last_own)
+    else:
+        unread_count = sum(1 for m in messages if m.sender_id != current_user_id)
+
+    return schemas.Conversation(
+        id=conversation.id,
+        skipper_id=conversation.skipper_id,
+        crew_id=conversation.crew_id,
+        source=conversation.source,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        skipper=schemas.CrewPoolProfile.model_validate(_filter_contact_fields(conversation.skipper)) if conversation.skipper else None,
+        crew=schemas.CrewPoolProfile.model_validate(_filter_contact_fields(conversation.crew)) if conversation.crew else None,
+        messages=[schemas.DirectMessage.model_validate(m) for m in messages],
+        last_message=schemas.DirectMessage.model_validate(last_message) if last_message else None,
+        unread_count=unread_count,
+    )
 
 
 # Auth Routes
@@ -433,6 +508,7 @@ def _get_contact_user_ids(db: Session, user_id: int) -> List[int]:
         .all()
     )
     ids = {r[0] for r in skipper_ids + crew_ids if r[0] and r[0] != user_id}
+    ids.update(_get_conversation_partner_ids(db, user_id))
     return list(ids)
 
 
@@ -449,7 +525,7 @@ def list_contacts(
     return users
 
 
-@app.get("/api/contacts/{user_id}", response_model=schemas.User)
+@app.get("/api/contacts/{user_id}", response_model=schemas.CrewPoolProfile)
 def get_contact_profile(
     user_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -462,7 +538,7 @@ def get_contact_profile(
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _filter_contact_fields(user)
 
 
 # Boat Routes
@@ -834,6 +910,360 @@ def mark_series_availability(
         created_availabilities.append(db_availability)
     
     return created_availabilities
+
+
+VALID_AVAILABILITY_PATTERNS = {"saturdays", "sundays", "weekends", "weekdays", "flexible"}
+
+
+def _serialize_patterns(patterns: Optional[List[str]]) -> Optional[str]:
+    if not patterns:
+        return None
+    cleaned = [p.strip().lower() for p in patterns if p and p.strip().lower() in VALID_AVAILABILITY_PATTERNS]
+    return ",".join(dict.fromkeys(cleaned)) if cleaned else None
+
+
+def _deserialize_patterns(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    return [p for p in raw.split(",") if p in VALID_AVAILABILITY_PATTERNS]
+
+
+def _serialize_date_ranges(ranges: Optional[List[schemas.DateRange]]) -> Optional[str]:
+    if not ranges:
+        return None
+    payload = [{"start": r.start, "end": r.end} for r in ranges if r.start and r.end]
+    return json.dumps(payload) if payload else None
+
+
+def _deserialize_date_ranges(raw: Optional[str]) -> List[dict]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [{"start": r.get("start"), "end": r.get("end")} for r in data if r.get("start") and r.get("end")]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _crew_interest_to_schema(interest: CrewInterest, upcoming_event_count: int = 0) -> schemas.CrewInterest:
+    return schemas.CrewInterest(
+        id=interest.id,
+        crew_id=interest.crew_id,
+        is_active=interest.is_active,
+        notes=interest.notes,
+        patterns=_deserialize_patterns(interest.patterns),
+        date_ranges=[schemas.DateRange(**r) for r in _deserialize_date_ranges(interest.date_ranges)],
+        created_at=interest.created_at,
+        updated_at=interest.updated_at,
+        crew=interest.crew,
+        upcoming_event_count=upcoming_event_count,
+    )
+
+
+# Crew Pool (generic interest, not event-specific)
+@app.get("/api/crew-pool", response_model=List[schemas.CrewInterest])
+def list_crew_pool(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """List crew members actively looking for opportunities (skipper view)."""
+    interests = (
+        db.query(CrewInterest)
+        .options(joinedload(CrewInterest.crew))
+        .filter(CrewInterest.is_active == True, CrewInterest.crew.has(User.is_active == True))
+        .order_by(CrewInterest.updated_at.desc())
+        .all()
+    )
+    crew_ids = [i.crew_id for i in interests]
+    event_counts: dict[int, int] = {}
+    if crew_ids:
+        rows = (
+            db.query(CrewAvailability.crew_id, func.count(CrewAvailability.id))
+            .join(Event)
+            .filter(
+                CrewAvailability.crew_id.in_(crew_ids),
+                Event.is_active == True,
+                Event.date >= datetime.utcnow(),
+            )
+            .group_by(CrewAvailability.crew_id)
+            .all()
+        )
+        event_counts = {crew_id: int(count) for crew_id, count in rows}
+    return [_crew_interest_to_schema(i, event_counts.get(i.crew_id, 0)) for i in interests]
+
+
+@app.get("/api/crew-pool/my", response_model=Optional[schemas.CrewInterest])
+def get_my_crew_interest(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    interest = (
+        db.query(CrewInterest)
+        .options(joinedload(CrewInterest.crew))
+        .filter(CrewInterest.crew_id == current_user.id)
+        .first()
+    )
+    if not interest:
+        return None
+    upcoming_count = (
+        db.query(func.count(CrewAvailability.id))
+        .join(Event)
+        .filter(
+            CrewAvailability.crew_id == current_user.id,
+            Event.is_active == True,
+            Event.date >= datetime.utcnow(),
+        )
+        .scalar()
+        or 0
+    )
+    return _crew_interest_to_schema(interest, int(upcoming_count))
+
+
+@app.put("/api/crew-pool", response_model=schemas.CrewInterest)
+def upsert_crew_interest(
+    data: schemas.CrewInterestCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Create or update generic crew interest profile."""
+    interest = db.query(CrewInterest).filter(CrewInterest.crew_id == current_user.id).first()
+    patterns = _serialize_patterns(data.patterns)
+    date_ranges = _serialize_date_ranges(data.date_ranges)
+    is_active = data.is_active if data.is_active is not None else True
+    was_active = interest.is_active if interest else False
+    is_new = interest is None
+
+    if interest:
+        interest.notes = data.notes
+        interest.patterns = patterns
+        interest.date_ranges = date_ranges
+        interest.is_active = is_active
+        interest.updated_at = datetime.utcnow()
+    else:
+        interest = CrewInterest(
+            crew_id=current_user.id,
+            notes=data.notes,
+            patterns=patterns,
+            date_ranges=date_ranges,
+            is_active=is_active,
+        )
+        db.add(interest)
+
+    db.flush()
+    interest.crew = current_user
+
+    should_notify = is_active and (is_new or (not was_active and is_active))
+    if should_notify:
+        notify_skippers_of_crew_pool_activity(
+            db,
+            interest,
+            is_reactivation=not is_new,
+        )
+
+    db.commit()
+    db.refresh(interest)
+    return _crew_interest_to_schema(interest)
+
+
+@app.delete("/api/crew-pool")
+def remove_crew_interest(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    interest = db.query(CrewInterest).filter(CrewInterest.crew_id == current_user.id).first()
+    if not interest:
+        raise HTTPException(status_code=404, detail="No crew interest profile found")
+    db.delete(interest)
+    db.commit()
+    return {"message": "Crew interest removed"}
+
+
+@app.get("/api/crew-pool/crew/{user_id}", response_model=schemas.CrewPoolProfile)
+def get_crew_pool_member_profile(
+    user_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get a crew pool member's profile (skipper view). Contact fields respect preferences."""
+    interest = (
+        db.query(CrewInterest)
+        .filter(CrewInterest.crew_id == user_id, CrewInterest.is_active == True)
+        .first()
+    )
+    if not interest:
+        raise HTTPException(status_code=404, detail="Crew member not found in pool")
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _filter_contact_fields(user)
+
+
+# Conversations (direct messaging from crew pool)
+@app.get("/api/conversations", response_model=List[schemas.Conversation])
+def list_conversations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    conversations = (
+        db.query(Conversation)
+        .options(
+            joinedload(Conversation.skipper),
+            joinedload(Conversation.crew),
+            joinedload(Conversation.messages).joinedload(DirectMessage.sender),
+        )
+        .filter(or_(Conversation.skipper_id == current_user.id, Conversation.crew_id == current_user.id))
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
+    return [_conversation_to_schema(c, current_user.id) for c in conversations]
+
+
+@app.get("/api/conversations/{conversation_id}", response_model=schemas.Conversation)
+def get_conversation(
+    conversation_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    conversation = (
+        db.query(Conversation)
+        .options(
+            joinedload(Conversation.skipper),
+            joinedload(Conversation.crew),
+            joinedload(Conversation.messages).joinedload(DirectMessage.sender),
+        )
+        .filter(Conversation.id == conversation_id)
+        .first()
+    )
+    if not conversation or (
+        conversation.skipper_id != current_user.id and conversation.crew_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return _conversation_to_schema(conversation, current_user.id)
+
+
+@app.post("/api/conversations", response_model=schemas.Conversation, status_code=status.HTTP_201_CREATED)
+def start_conversation(
+    data: schemas.ConversationCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Start or continue a crew-pool conversation. Skippers initiate contact with crew in the pool."""
+    if current_user.role != "skipper" and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only skippers can initiate crew pool contact")
+
+    message_body = (data.message or "").strip()
+    if not message_body:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    crew_user = db.query(User).filter(User.id == data.crew_id, User.is_active == True).first()
+    if not crew_user:
+        raise HTTPException(status_code=404, detail="Crew member not found")
+
+    interest = (
+        db.query(CrewInterest)
+        .filter(CrewInterest.crew_id == data.crew_id, CrewInterest.is_active == True)
+        .first()
+    )
+    if not interest:
+        raise HTTPException(status_code=404, detail="Crew member is not in the active crew pool")
+
+    if data.crew_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot message yourself")
+
+    conversation = (
+        db.query(Conversation)
+        .filter(
+            Conversation.skipper_id == current_user.id,
+            Conversation.crew_id == data.crew_id,
+            Conversation.source == ConversationSource.CREW_POOL.value,
+        )
+        .first()
+    )
+    is_new = conversation is None
+    if is_new:
+        conversation = Conversation(
+            skipper_id=current_user.id,
+            crew_id=data.crew_id,
+            source=ConversationSource.CREW_POOL.value,
+        )
+        db.add(conversation)
+        db.flush()
+
+    message = DirectMessage(
+        conversation_id=conversation.id,
+        sender_id=current_user.id,
+        body=message_body,
+    )
+    db.add(message)
+    conversation.updated_at = datetime.utcnow()
+
+    if is_new:
+        preview = message_body[:120] + ("…" if len(message_body) > 120 else "")
+        _create_notification_and_push(
+            db,
+            user_id=data.crew_id,
+            kind="crew_pool_message",
+            title="Skipper reached out",
+            body=f"{current_user.name} sent you a message from the Crew Pool: {preview}",
+            link=f"/messages/{conversation.id}",
+        )
+    db.commit()
+
+    conversation = (
+        db.query(Conversation)
+        .options(
+            joinedload(Conversation.skipper),
+            joinedload(Conversation.crew),
+            joinedload(Conversation.messages).joinedload(DirectMessage.sender),
+        )
+        .filter(Conversation.id == conversation.id)
+        .first()
+    )
+    return _conversation_to_schema(conversation, current_user.id)
+
+
+@app.post("/api/conversations/{conversation_id}/messages", response_model=schemas.DirectMessage)
+def send_message(
+    conversation_id: int,
+    data: schemas.DirectMessageCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    conversation = _conversation_for_user(db, conversation_id, current_user.id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    message_body = (data.body or "").strip()
+    if not message_body:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    message = DirectMessage(
+        conversation_id=conversation.id,
+        sender_id=current_user.id,
+        body=message_body,
+    )
+    db.add(message)
+    conversation.updated_at = datetime.utcnow()
+
+    recipient_id = (
+        conversation.crew_id if conversation.skipper_id == current_user.id else conversation.skipper_id
+    )
+    if recipient_id != current_user.id:
+        preview = message_body[:120] + ("…" if len(message_body) > 120 else "")
+        _create_notification_and_push(
+            db,
+            user_id=recipient_id,
+            kind="crew_pool_message",
+            title="New message",
+            body=f"{current_user.name}: {preview}",
+            link=f"/messages/{conversation.id}",
+        )
+
+    db.commit()
+    db.refresh(message)
+    return message
 
 
 @app.get("/api/series", response_model=List[str])

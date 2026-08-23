@@ -19,6 +19,7 @@ class UserBase(BaseModel):
     allow_phone_contact: Optional[bool] = False
     allow_sms_contact: Optional[bool] = False
     contact_preference: Optional[str] = "email"
+    crew_pool_email_alerts: Optional[bool] = False
 
 
 class UserCreate(UserBase):
@@ -44,6 +45,7 @@ class UserUpdate(BaseModel):
     allow_phone_contact: Optional[bool] = None
     allow_sms_contact: Optional[bool] = None
     contact_preference: Optional[str] = None
+    crew_pool_email_alerts: Optional[bool] = None
 
 
 class AdminUserUpdate(UserUpdate):
@@ -377,5 +379,94 @@ class PushSubscription(BaseModel):
     user_id: int
     created_at: datetime
     
+    class Config:
+        from_attributes = True
+
+
+class DateRange(BaseModel):
+    start: str  # YYYY-MM-DD
+    end: str    # YYYY-MM-DD
+
+
+class CrewInterestBase(BaseModel):
+    notes: Optional[str] = None
+    patterns: Optional[List[str]] = []
+    date_ranges: Optional[List[DateRange]] = []
+    is_active: Optional[bool] = True
+
+
+class CrewInterestCreate(CrewInterestBase):
+    pass
+
+
+class CrewInterest(CrewInterestBase):
+    id: int
+    crew_id: int
+    created_at: datetime
+    updated_at: datetime
+    crew: Optional[User] = None
+    upcoming_event_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+class CrewPoolProfile(BaseModel):
+    """Profile view with contact fields filtered by user preferences."""
+    id: int
+    name: str
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+    experience_level: Optional[str] = None
+    bio: Optional[str] = None
+    weight: Optional[int] = None
+    certifications: Optional[str] = None
+    position_preferences: Optional[str] = None
+    profile_picture: Optional[str] = None
+    allow_email_contact: Optional[bool] = True
+    allow_phone_contact: Optional[bool] = False
+    allow_sms_contact: Optional[bool] = False
+    contact_preference: Optional[str] = "email"
+    preferred_contact_method: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DirectMessageCreate(BaseModel):
+    body: str
+
+
+class DirectMessage(BaseModel):
+    id: int
+    conversation_id: int
+    sender_id: int
+    body: str
+    created_at: datetime
+    sender: Optional[User] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationCreate(BaseModel):
+    crew_id: int
+    message: str
+
+
+class Conversation(BaseModel):
+    id: int
+    skipper_id: int
+    crew_id: int
+    source: str
+    created_at: datetime
+    updated_at: datetime
+    skipper: Optional[CrewPoolProfile] = None
+    crew: Optional[CrewPoolProfile] = None
+    messages: Optional[List[DirectMessage]] = []
+    last_message: Optional[DirectMessage] = None
+    unread_count: Optional[int] = 0
+
     class Config:
         from_attributes = True
