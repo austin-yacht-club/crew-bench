@@ -5,7 +5,7 @@
   "terminals": [
     {
       "name": "backend",
-      "command": "cd backend && source .venv/bin/activate && DATABASE_URL='postgresql://crewbench:crewbench_secret@localhost:5432/crewbench' SECRET_KEY='dev-secret-key' ADMIN_EMAIL='admin@crewbench.app' ADMIN_PASSWORD='admin123' LOG_LEVEL='INFO' uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+      "command": "cd backend && . .venv/bin/activate && set -a && . ../.env && set +a && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     },
     {
       "name": "frontend",

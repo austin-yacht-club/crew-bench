@@ -34,7 +34,11 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from calendar_importer import import_austin_yacht_club_calendar, fetch_calendar_preview
+from settings import get_admin_credentials
 import httpx
+
+# Fail closed at import: never start with a missing or known-insecure admin password.
+ADMIN_EMAIL, ADMIN_PASSWORD = get_admin_credentials()
 
 Base.metadata.create_all(bind=engine)
 
@@ -165,8 +169,7 @@ async def startup_event():
     if ROOT_PATH:
         logger.info("Root path: %s", ROOT_PATH)
     db = next(get_db())
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@crewbench.app")
-    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_email, admin_password = ADMIN_EMAIL, ADMIN_PASSWORD
     
     existing_admin = db.query(User).filter(User.email == admin_email).first()
     if not existing_admin:

@@ -4,6 +4,21 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.7.0] - 2026-08-23
+
+### Security
+
+#### Required secrets (no plaintext defaults)
+- **docker-compose.yml**: Removed shipped `POSTGRES_PASSWORD`, `SECRET_KEY`, and `ADMIN_PASSWORD` values. Compose interpolates them from `.env` (or the process environment) and **refuses to start** if they are unset or empty (`${VAR:?...}`).
+- **Backend**: No fallback secrets. Missing, too-short, or known-insecure values (`admin123`, `crewbench_secret`, `your-secret-key-change-in-production`, and similar placeholders) raise `SecretConfigError` at import and the process exits.
+- **`.env.example`**: Template with empty required secrets. Copy to `.env` or run `./scripts/generate_secrets.sh`. `.env` remains gitignored.
+
+### Changed
+
+- **Breaking**: `docker compose up` requires secrets to be set first. Run `./scripts/generate_secrets.sh` (or export `POSTGRES_PASSWORD`, `SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`).
+- **Breaking**: Existing databases created with the old `crewbench_secret` password must keep that password in `.env` or be reset with `docker compose down -v`.
+- **Docs / scripts**: README, AGENT.md, sanity-check and verify scripts read credentials from `.env` instead of documenting a default admin password.
+
 ## [1.6.1] - 2026-08-19
 
 ### Fixed

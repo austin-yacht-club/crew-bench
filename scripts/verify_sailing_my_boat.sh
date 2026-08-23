@@ -4,11 +4,22 @@
 # Uses API to log in, ensure an event and boat exist, create a skipper commitment, then prints verification steps.
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 API="${API_BASE:-http://localhost:8000}"
 EVENTS_URL="$API/api/events"
 AUTH_URL="$API/api/auth"
 BOATS_URL="$API/api/boats"
 COMMITMENTS_URL="$API/api/skipper-commitments"
+ADMIN_EMAIL="${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}"
 
 echo "=== Verify 'Sailing my boat' (no 'Mark Available' when committed) ==="
 echo "API base: $API"
@@ -17,9 +28,11 @@ echo ""
 # Login as admin
 TOKEN=$(curl -s -X POST "$AUTH_URL/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin@crewbench.app&password=admin123" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
+  --data-urlencode "username=$ADMIN_EMAIL" \
+  --data-urlencode "password=$ADMIN_PASSWORD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 if [ -z "$TOKEN" ]; then
   echo "Failed to get token. Is the backend running and admin account present?"
+  echo "Login uses ADMIN_EMAIL / ADMIN_PASSWORD from .env"
   exit 1
 fi
 echo "Logged in."
@@ -73,7 +86,7 @@ echo "Created skipper commitment for event $EVENT_ID (sailing your boat)."
 echo ""
 echo "--- Verification steps ---"
 echo "1. Open the app:  http://localhost:3333  (or http://localhost:3000 if using npm start)"
-echo "2. Log in as admin@crewbench.app / admin123"
+echo "2. Log in with ADMIN_EMAIL / ADMIN_PASSWORD from your .env"
 echo "3. Go to the Events page"
 echo "4. Find the event (e.g. 'Verify Sailing My Boat Test' or the first upcoming event)"
 echo "5. You should see 'Sailing my boat' (disabled) instead of 'Mark Available'"
