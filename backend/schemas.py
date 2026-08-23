@@ -403,6 +403,7 @@ class CrewInterest(CrewInterestBase):
     created_at: datetime
     updated_at: datetime
     crew: Optional[User] = None
+    upcoming_event_count: Optional[int] = 0
 
     class Config:
         from_attributes = True

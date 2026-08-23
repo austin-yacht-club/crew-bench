@@ -12,7 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from database import engine, get_db, Base
 from log_config import configure_logging
@@ -872,7 +872,7 @@ def _deserialize_date_ranges(raw: Optional[str]) -> List[dict]:
     return []
 
 
-def _crew_interest_to_schema(interest: CrewInterest) -> schemas.CrewInterest:
+def _crew_interest_to_schema(interest: CrewInterest, upcoming_event_count: int = 0) -> schemas.CrewInterest:
     return schemas.CrewInterest(
         id=interest.id,
         crew_id=interest.crew_id,
@@ -883,6 +883,7 @@ def _crew_interest_to_schema(interest: CrewInterest) -> schemas.CrewInterest:
         created_at=interest.created_at,
         updated_at=interest.updated_at,
         crew=interest.crew,
+        upcoming_event_count=upcoming_event_count,
     )
 
 
@@ -900,7 +901,22 @@ def list_crew_pool(
         .order_by(CrewInterest.updated_at.desc())
         .all()
     )
-    return [_crew_interest_to_schema(i) for i in interests]
+    crew_ids = [i.crew_id for i in interests]
+    event_counts: dict[int, int] = {}
+    if crew_ids:
+        rows = (
+            db.query(CrewAvailability.crew_id, func.count(CrewAvailability.id))
+            .join(Event)
+            .filter(
+                CrewAvailability.crew_id.in_(crew_ids),
+                Event.is_active == True,
+                Event.date >= datetime.utcnow(),
+            )
+            .group_by(CrewAvailability.crew_id)
+            .all()
+        )
+        event_counts = {crew_id: int(count) for crew_id, count in rows}
+    return [_crew_interest_to_schema(i, event_counts.get(i.crew_id, 0)) for i in interests]
 
 
 @app.get("/api/crew-pool/my", response_model=Optional[schemas.CrewInterest])
@@ -914,7 +930,20 @@ def get_my_crew_interest(
         .filter(CrewInterest.crew_id == current_user.id)
         .first()
     )
-    return _crew_interest_to_schema(interest) if interest else None
+    if not interest:
+        return None
+    upcoming_count = (
+        db.query(func.count(CrewAvailability.id))
+        .join(Event)
+        .filter(
+            CrewAvailability.crew_id == current_user.id,
+            Event.is_active == True,
+            Event.date >= datetime.utcnow(),
+        )
+        .scalar()
+        or 0
+    )
+    return _crew_interest_to_schema(interest, int(upcoming_count))
 
 
 @app.put("/api/crew-pool", response_model=schemas.CrewInterest)
