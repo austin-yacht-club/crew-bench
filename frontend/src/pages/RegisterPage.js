@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { Sailing } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import { getAPIErrorMessage } from '../services/api';
 import { Recaptcha, getRecaptchaToken } from '../components/Recaptcha';
 
 const RECAPTCHA_SITE_KEY = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
@@ -78,7 +79,7 @@ const RegisterPage = () => {
       await login(formData.email, formData.password);
       navigate('/events');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      setError(getAPIErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }

@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 
-from database import engine, get_db, Base, ensure_schema_updates
+from database import get_db, initialize_database
 from crew_pool_notifications import notify_skippers_of_crew_pool_activity
 from log_config import configure_logging
 
@@ -42,8 +42,7 @@ import httpx
 # Fail closed at import: never start with a missing or known-insecure admin password.
 ADMIN_EMAIL, ADMIN_PASSWORD = get_admin_credentials()
 
-Base.metadata.create_all(bind=engine)
-ensure_schema_updates()
+initialize_database()
 
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 

@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { Sailing } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import { getAPIErrorMessage } from '../services/api';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ const LoginPage = () => {
         navigate('/events');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      setError(getAPIErrorMessage(err, 'Login failed. Please try again.'));
     } finally {
       setLoading(false);
     }

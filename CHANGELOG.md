@@ -4,6 +4,13 @@ All notable changes to the Crew Bench application will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Database startup**: The backend now exits with an actionable fatal error when PostgreSQL is unreachable, credentials do not match a persisted database, a schema patch fails, or an existing schema is missing a modeled table or column.
+- **Authentication errors**: Login and registration now show a service-unavailable message for backend/network failures and render API validation details safely.
+
 ## [1.7.0] - 2026-08-23
 
 ### Security

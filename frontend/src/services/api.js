@@ -29,6 +29,25 @@ api.interceptors.response.use(
   }
 );
 
+export const getAPIErrorMessage = (error, fallback) => {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const validationMessages = detail
+      .map((item) => item?.msg)
+      .filter(Boolean);
+    if (validationMessages.length) {
+      return validationMessages.join(' ');
+    }
+  }
+  if (!error.response || error.response.status >= 500) {
+    return 'Service is temporarily unavailable. Please try again later.';
+  }
+  return fallback;
+};
+
 export const authAPI = {
   login: (email, password) => {
     const formData = new URLSearchParams();
