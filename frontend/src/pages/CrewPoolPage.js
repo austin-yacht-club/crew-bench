@@ -24,12 +24,14 @@ import {
   Search,
   Event as EventIcon,
   CalendarMonth,
+  Send,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { crewPoolAPI, crewRatingsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 import StarRating from '../components/StarRating';
 import ContactProfileDialog from '../components/ContactProfileDialog';
+import CrewPoolContactDialog from '../components/CrewPoolContactDialog';
 
 const PATTERN_OPTIONS = [
   { value: 'saturdays', label: 'Every Saturday' },
@@ -67,6 +69,9 @@ const CrewPoolPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [crewRatingSummaries, setCrewRatingSummaries] = useState({});
   const [profileDialogUserId, setProfileDialogUserId] = useState(null);
+  const [contactCrewMember, setContactCrewMember] = useState(null);
+
+  const isSkipper = user?.role === 'skipper' || user?.is_admin;
 
   useEffect(() => {
     loadData();
@@ -423,9 +428,21 @@ const CrewPoolPage = () => {
                       </Box>
                     )}
 
-                    <Button size="small" onClick={() => setProfileDialogUserId(c.id)}>
-                      View profile
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Button size="small" onClick={() => setProfileDialogUserId(c.id)}>
+                        View profile
+                      </Button>
+                      {isSkipper && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<Send />}
+                          onClick={() => setContactCrewMember(c)}
+                        >
+                          Send message
+                        </Button>
+                      )}
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -467,6 +484,12 @@ const CrewPoolPage = () => {
         open={Boolean(profileDialogUserId)}
         onClose={() => setProfileDialogUserId(null)}
         userId={profileDialogUserId}
+        source="crew-pool"
+      />
+      <CrewPoolContactDialog
+        open={Boolean(contactCrewMember)}
+        onClose={() => setContactCrewMember(null)}
+        crewMember={contactCrewMember}
       />
     </Box>
   );

@@ -13,7 +13,7 @@ import {
   Divider,
 } from '@mui/material';
 import { Email, Phone, Close } from '@mui/icons-material';
-import { contactsAPI } from '../services/api';
+import { contactsAPI, crewPoolAPI } from '../services/api';
 
 const EXPERIENCE_LABELS = {
   novice: 'Never sailed before',
@@ -23,7 +23,7 @@ const EXPERIENCE_LABELS = {
   expert: 'Expert',
 };
 
-const ContactProfileDialog = ({ open, onClose, userId }) => {
+const ContactProfileDialog = ({ open, onClose, userId, source = 'contact' }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -38,8 +38,10 @@ const ContactProfileDialog = ({ open, onClose, userId }) => {
     setProfile(null);
     setError(false);
     setLoading(true);
-    contactsAPI
-      .get(userId)
+    const fetchProfile = source === 'crew-pool'
+      ? crewPoolAPI.getCrewProfile(userId)
+      : contactsAPI.get(userId);
+    fetchProfile
       .then((res) => {
         if (!cancelled) setProfile(res.data);
       })
@@ -50,7 +52,7 @@ const ContactProfileDialog = ({ open, onClose, userId }) => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [open, userId]);
+  }, [open, userId, source]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -127,6 +129,11 @@ const ContactProfileDialog = ({ open, onClose, userId }) => {
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Contact
             </Typography>
+            {profile.preferred_contact_method && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Prefers {profile.preferred_contact_method} contact
+              </Typography>
+            )}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {profile.allow_email_contact && profile.email && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
