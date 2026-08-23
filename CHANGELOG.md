@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+#### Separate debug and production stacks
+- **`docker-compose.dev.yml` / `docker-compose.prod.yml`**: `docker-compose.yml` is now a shared base paired with one environment overlay. Each overlay is its own Compose project (`crew-bench-dev` / `crew-bench-prod`) with its own host ports, database and volumes, so development never disturbs production.
+- **Ports**: production keeps frontend `3333`, API `8000`, Postgres `5432`; debug uses frontend `3334`, API `8001`, Postgres `5433`. All overridable via `PROD_*` / `DEV_*` variables.
+- **Databases**: production uses `crewbench`, debug uses `crewbench_dev`, in separate Postgres containers with separate volumes.
+- **`scripts/compose.sh`**: Wrapper that selects the overlay, project name and environment file — `./scripts/compose.sh dev up -d --build`.
+- **Per-environment secrets**: `scripts/generate_secrets.sh` accepts a target (`.env`, `.env.dev`, `.env.prod`); `compose.sh` prefers `.env.<env>` over `.env`.
+- **Live code sync without bind mounts**: the debug stack defines Compose `develop.watch` rules, so `./scripts/compose.sh dev up -d --build --watch` syncs backend source into the container and rebuilds on dependency changes.
+- **`scripts/migrate_db_to_volume.sh`**: Copies an existing `./db` directory into the named volume for a chosen stack, refusing to run on a Postgres major-version mismatch or a non-empty target.
+
+#### Automatic schema reconciliation for pre-existing databases
+- **`ensure_schema_updates()`**: Now compares every mapped table against the live database and adds the columns and indexes later releases introduced, instead of applying two hand-written `ALTER TABLE users` statements. `create_all` never alters existing tables, so a database carried over from an older release was missing every column added since it was created (for example `users.position_preferences`, `users.must_change_password`, `events.series_index`, `crew_requests.waitlist_position`).
+- **Reconcile, then validate**: `initialize_database()` reconciles before `validate_database_schema()`, so a database that is merely outdated repairs itself and starts, while anything reconciliation cannot fix still aborts startup with the missing tables and columns named. Reconciliation is additive only — nothing is dropped or retyped.
+- **`backend/manage_schema.py` and `scripts/check_schema.sh`**: `check` reports schema drift read-only, `apply` runs the same additive sequence as startup — `./scripts/check_schema.sh prod check`.
+- **Tests**: `backend/tests/test_schema_reconciliation.py` covers added columns and tables, default backfill for existing rows, NOT NULL columns on populated tables, index creation, idempotency, validation after reconciliation, and reporting (never dropping) columns the models no longer define.
+
+### Changed
+
+- **Breaking**: `docker compose up` with no `-f` flags no longer starts a usable stack; use `./scripts/compose.sh <dev|prod> up -d --build` or pass both files explicitly.
+- **Breaking**: Postgres data moved from the `./db` bind mount to named Docker volumes (`crew-bench-prod-db-data`, `crew-bench-dev-db-data`). Existing deployments must run `./scripts/migrate_db_to_volume.sh prod` or start from an empty database. `docker compose down -v` now really deletes the database, which it never did for the bind mount.
+- **Backend logs**: `LOG_FILE` paths under `/var/log/crewbench` persist in a named volume instead of being lost with the container.
+- **`docker-compose.override.yml`**: Removed; its local-testing settings (`ROOT_PATH=""`, `PUBLIC_URL=""`) are part of the debug overlay.
+- **`scripts/sanity_check_proxy.sh`**: Runs against the debug stack so pre-deployment checks cannot touch production data.
+- **An outdated database no longer blocks startup on its own**: it is brought up to date first. A column that cannot be added raises `SchemaUpdateError` (a `DatabaseInitializationError`) naming the statement that failed.
+
 ### Fixed
 
 - **Database startup**: The backend now exits with an actionable fatal error when PostgreSQL is unreachable, credentials do not match a persisted database, a schema patch fails, or an existing schema is missing a modeled table or column.

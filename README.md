@@ -133,7 +133,19 @@ Use **Race Events** when you care about a particular race day or series.
 
 ### Prerequisites
 
-- Docker and Docker Compose installed
+- Docker, and Docker Compose v2 as the `docker compose` plugin
+- Compose v2.22 or newer if you want `--watch` for live code changes in the debug stack (`docker compose version` to check)
+
+### Already running an older version?
+
+Two things changed that affect existing installations, so read this before starting:
+
+- **Postgres data moved out of `./db` into a named volume.** If a `./db` directory exists in your checkout, that is your database, and starting a stack now would quietly create an empty one beside it. Moving it is a one-time manual step that startup does **not** do for you: [Migrating from the old `./db` bind mount](#migrating-from-the-old-db-bind-mount).
+- **`docker compose up` on its own no longer starts the application.** `docker-compose.yml` is a shared base that publishes no ports; every start goes through `./scripts/compose.sh <dev|prod>` or names both files explicitly. Update any deploy script, systemd unit, or runbook that calls `docker compose up` or `docker-compose up` directly.
+
+No `./db` directory means nothing to migrate — follow the steps below as normal.
+
+Note the two unrelated things called "migration" here: moving the data directory into a volume is a manual step you run once, while bringing an old *schema* up to date happens automatically on every start ([Database schema updates](#database-schema-updates)).
 
 ### Running the Application
 
@@ -151,26 +163,138 @@ cd crew-bench
 
 This writes a gitignored `.env` with unique `POSTGRES_PASSWORD`, `SECRET_KEY`, and `ADMIN_PASSWORD`. Save the printed admin login. Alternatively, copy `.env.example` to `.env` and set those values yourself (do not leave them blank, and do not use values like `admin123` or `crewbench_secret`).
 
-3. Start the application with Docker Compose:
+3. Start a stack. There is no default stack, so name the one you want:
 
 ```bash
-docker compose up --build
+./scripts/compose.sh prod up -d --build   # production
+./scripts/compose.sh dev  up -d --build   # debug/development
 ```
 
+The wrapper takes any `docker compose` arguments after the stack name and picks the right overlay, project name and environment file for you.
+
 4. Access the application:
-   - Frontend: http://localhost:3333
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
+
+| Stack | Frontend | Backend API | API docs | Postgres |
+|-------|----------|-------------|----------|----------|
+| `prod` | http://localhost:3333 | http://localhost:8000 | http://localhost:8000/docs | `localhost:5432` |
+| `dev`  | http://localhost:3334 | http://localhost:8001 | http://localhost:8001/docs | `localhost:5433` |
 
 ### Admin account
 
-The initial admin user is created from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your `.env`. There is no default password in the repository. The admin must change this password on first login.
+The initial admin user is created from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your environment file. There is no default password in the repository. The admin must change this password on first login.
 
-If you already have a Postgres data volume from an earlier password, either put that password in `.env` or reset the volume:
+If you already have a Postgres volume from an earlier password, either put that password in your environment file or reset that stack's volume:
 
 ```bash
-docker compose down -v
+./scripts/compose.sh prod down -v
 ```
+
+## Debug and production stacks
+
+`docker-compose.yml` is a shared base and is not meant to be run on its own: it publishes no ports and names no project. Pair it with exactly one overlay, which the `compose.sh` wrapper does for you.
+
+| | `prod` | `dev` |
+|---|---|---|
+| Compose project | `crew-bench-prod` | `crew-bench-dev` |
+| Overlay | `docker-compose.prod.yml` | `docker-compose.dev.yml` |
+| Frontend port | 3333 | 3334 |
+| Backend port | 8000 | 8001 |
+| Postgres port | 5432 | 5433 |
+| Database | `crewbench` | `crewbench_dev` |
+| Data volume | `crew-bench-prod-db-data` | `crew-bench-dev-db-data` |
+| Log volume | `crew-bench-prod-backend-logs` | `crew-bench-dev-backend-logs` |
+| Log level | `INFO` | `DEBUG` |
+| Backend reload | off | on (`--reload`) |
+| Restart policy | `unless-stopped` | none |
+
+Because the two stacks are separate Compose projects with separate volumes and ports, they can run at the same time and `down -v` on one never touches the other.
+
+```bash
+./scripts/compose.sh dev  up -d --build      # start the debug stack
+./scripts/compose.sh dev  logs -f backend
+./scripts/compose.sh dev  down -v            # reset the debug database only
+./scripts/compose.sh prod ps
+```
+
+Override any port or database name from your environment file (see `.env.example`), e.g. `DEV_FRONTEND_PORT=4000` or `PROD_POSTGRES_DB=crewbench_live`.
+
+The long form works too, if you prefer not to use the wrapper:
+
+```bash
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+### Live code changes in the debug stack
+
+The debug overlay uses Compose watch rather than a bind mount, so nothing in the working tree is mounted into a container:
+
+```bash
+./scripts/compose.sh dev up -d --build --watch
+```
+
+Backend source is synced into the running container (which runs uvicorn with `--reload`), and changes to `requirements.txt`, the `Dockerfile`, or frontend sources trigger a rebuild. Without `--watch`, rebuild with `./scripts/compose.sh dev up -d --build` after making changes.
+
+### Separate secrets per stack
+
+`compose.sh` uses `.env.<env>` when it exists and falls back to `.env`. To give production and debug completely independent credentials:
+
+```bash
+./scripts/generate_secrets.sh .env.prod
+./scripts/generate_secrets.sh .env.dev
+```
+
+## Data storage and volumes
+
+All persistent state lives in named Docker volumes; no container writes into the working tree.
+
+```bash
+docker volume ls | grep crew-bench
+```
+
+- `crew-bench-<env>-db-data` — PostgreSQL data directory
+- `crew-bench-<env>-backend-logs` — mounted at `/var/log/crewbench`; point `LOG_FILE` there to keep logs across container rebuilds
+
+Back up a database without stopping the stack:
+
+```bash
+./scripts/compose.sh prod exec -T db pg_dump -U crewbench crewbench > backup.sql
+```
+
+### Migrating from the old `./db` bind mount
+
+Earlier versions stored PostgreSQL data in a `./db` directory inside the repository. If that directory exists, migrate it before starting a stack — otherwise the stack comes up on an empty volume and your data stays behind in `./db`, untouched but unused.
+
+```bash
+./scripts/compose.sh prod down                 # stop the stack, if it is running
+./scripts/migrate_db_to_volume.sh prod         # ./db -> crew-bench-prod-db-data
+./scripts/compose.sh prod up -d --build
+./scripts/check_schema.sh prod check           # confirm the schema matches the models
+```
+
+The script only reads `./db`. It refuses to run while the stack is up, to overwrite a non-empty volume, or to copy a data directory written by a different PostgreSQL major version (dump and restore instead). Delete `./db` once the stack is confirmed working.
+
+A database carried forward this way is usually also behind on schema, since it was created by an older release. Startup brings it up to date automatically — see [Database schema updates](#database-schema-updates).
+
+Note that `docker compose down -v` never deleted the old bind-mount directory, so a "full reset" left the previous database in place. With named volumes, `down -v` really does delete the data.
+
+## Database schema updates
+
+This project has no migration tool. `create_all` creates tables that are absent but never alters a table that already exists, so a database created by an older release would otherwise be permanently missing every column added since. Startup therefore does three things in order, before serving any request:
+
+1. create tables that do not exist yet
+2. add missing columns and indexes to tables that do, leaving existing rows in place and never dropping anything
+3. validate the result, and refuse to start if any modeled table or column is still missing
+
+Step 3 keeps the guarantee that the backend never serves traffic against a schema it does not match: additive drift repairs itself, and anything else (a renamed or retyped column, a permissions problem) is a fatal startup error naming what is wrong.
+
+Inspect a running stack without changing it:
+
+```bash
+./scripts/check_schema.sh prod check     # read-only report, exit 1 if drifted
+./scripts/check_schema.sh prod apply     # add what is missing
+```
+
+Columns with a scalar model default (for example `allow_email_contact`) are added with that SQL default, so rows that already exist get a sensible value. Columns whose default is computed per row in Python (for example `created_at`) are added empty for existing rows. Columns present in the database but no longer in the models are reported and left alone.
 
 ## User Roles
 
@@ -278,18 +402,21 @@ Optional: set `PUBLIC_URL=http://localhost:3000` when starting the backend so re
 
 ## Environment Variables
 
-Secrets are read from a project-root `.env` file (gitignored) or from the process environment. Copy `.env.example` to `.env` or run `./scripts/generate_secrets.sh`. Docker Compose interpolates `.env` automatically and **exits with an error** if required secrets are unset or empty.
+Secrets are read from a project-root environment file (gitignored) or from the process environment. Copy `.env.example` to `.env` or run `./scripts/generate_secrets.sh`. `compose.sh` passes `.env.<stack>` when it exists and `.env` otherwise; Compose interpolates that file and **exits with an error** if required secrets are unset or empty.
 
 ### Backend (required)
-- `POSTGRES_PASSWORD` - PostgreSQL password. Must be set before `docker compose up`. At least 12 characters; known defaults such as `crewbench_secret` are rejected.
+- `POSTGRES_PASSWORD` - PostgreSQL password. Must be set before starting a stack. At least 12 characters; known defaults such as `crewbench_secret` are rejected.
 - `SECRET_KEY` - JWT signing key. At least 32 characters; placeholder values such as `your-secret-key-change-in-production` are rejected.
 - `ADMIN_EMAIL` - Initial admin email (created on first startup if missing).
 - `ADMIN_PASSWORD` - Initial admin password. At least 12 characters; `admin123` and other known defaults are rejected.
-- `DATABASE_URL` - PostgreSQL connection string. Set automatically by Compose from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`. When running the backend outside Compose, set `DATABASE_URL` or the `POSTGRES_*` variables.
+- `DATABASE_URL` - PostgreSQL connection string. Set automatically by Compose from `POSTGRES_USER` / `POSTGRES_PASSWORD` and the stack's database name. When running the backend outside Compose, set `DATABASE_URL` or the `POSTGRES_*` variables.
 
 ### Backend (optional)
-- `POSTGRES_USER` - PostgreSQL user (default: `crewbench`).
-- `POSTGRES_DB` - PostgreSQL database name (default: `crewbench`).
+- `POSTGRES_USER` - PostgreSQL user, shared by both stacks (default: `crewbench`).
+- `PROD_POSTGRES_DB` / `DEV_POSTGRES_DB` - Database name per stack (defaults: `crewbench` / `crewbench_dev`).
+- `PROD_FRONTEND_PORT`, `PROD_BACKEND_PORT`, `PROD_DB_PORT` - Published production ports (defaults: 3333, 8000, 5432).
+- `DEV_FRONTEND_PORT`, `DEV_BACKEND_PORT`, `DEV_DB_PORT` - Published debug ports (defaults: 3334, 8001, 5433).
+- `DEV_LOG_LEVEL` - Log level for the debug stack (default: `DEBUG`).
 - `RECAPTCHA_SECRET_KEY` - reCAPTCHA v2 secret key for registration CAPTCHA. If set, new users must pass CAPTCHA verification.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - Web Push VAPID keys for push notifications. Generate with e.g. `python -m py_vapid` or `npx web-push generate-vapid-keys`.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS` - When `SMTP_HOST` is set, crew pool alert emails are sent via SMTP; otherwise they are logged (dev/test).
@@ -318,13 +445,13 @@ When you cannot use different ports and must serve the backend on a sub-path of 
 
 ### Sanity check before deployment
 
-Run the reverse-proxy sanity tests and a live health check (starts db and backend with Docker):
+Run the reverse-proxy sanity tests and a live health check against the debug stack, so production is untouched:
 
 ```bash
 ./scripts/sanity_check_proxy.sh
 ```
 
-Optional: set `PUBLIC_URL` to your public base URL (default `https://app.example.com`) to verify CORS for that origin. The script runs pytest in `backend/tests/test_proxy_sanity.py` and then curls `http://localhost:8000/api/health`.
+Optional: set `PUBLIC_URL` to your public base URL (default `https://app.example.com`) to verify CORS for that origin, or `CREW_BENCH_ENV=prod` to check the production stack instead. The script runs pytest in `backend/tests/test_proxy_sanity.py` and then curls `/api/health` on that stack's backend port.
 
 ## License
 

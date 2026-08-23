@@ -9,6 +9,8 @@ venv/
 
 # Environment (never commit secrets)
 .env
+.env.dev
+.env.prod
 .env.local
 .env.*.local
 *.env
@@ -46,3 +48,5 @@ htmlcov/
 # Database
 *.db
 *.sqlite3
+# Legacy Postgres bind mount; data now lives in named Docker volumes.
+/db/
