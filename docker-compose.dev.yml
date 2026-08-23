@@ -1,0 +1,66 @@
+# Debug/development overlay. Use with the shared base:
+#   ./scripts/compose.sh dev up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Runs as its own Compose project (crew-bench-dev) on different host ports, with
+# its own named volumes and its own database, so nothing here touches the
+# production stack or its data.
+#
+# Live code sync (no bind mounts) is available through Compose watch:
+#   ./scripts/compose.sh dev up -d --build --watch
+#   ./scripts/compose.sh dev watch
+#
+# Override any port or the database name from the environment file, e.g.
+#   DEV_FRONTEND_PORT=4000 in .env / .env.dev
+name: crew-bench-dev
+
+services:
+  db:
+    environment:
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-crewbench_dev}
+    ports:
+      - "${DEV_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crewbench} -d ${DEV_POSTGRES_DB:-crewbench_dev}"]
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crewbench}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}@db:5432/${DEV_POSTGRES_DB:-crewbench_dev}
+      LOG_LEVEL: ${DEV_LOG_LEVEL:-DEBUG}
+      # Served directly on the published port here, so no reverse-proxy sub-path.
+      ROOT_PATH: ""
+      PUBLIC_URL: ""
+    ports:
+      - "${DEV_BACKEND_PORT:-8001}:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - .venv/
+            - tests/
+            - __pycache__/
+        - action: rebuild
+          path: ./backend/requirements.txt
+        - action: rebuild
+          path: ./backend/Dockerfile
+
+  frontend:
+    ports:
+      - "${DEV_FRONTEND_PORT:-3334}:80"
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend/src
+        - action: rebuild
+          path: ./frontend/public
+        - action: rebuild
+          path: ./frontend/package.json
+
+volumes:
+  db_data:
+    name: crew-bench-dev-db-data
+  backend_logs:
+    name: crew-bench-dev-backend-logs

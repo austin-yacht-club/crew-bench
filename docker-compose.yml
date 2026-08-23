@@ -1,5 +1,19 @@
-# Secrets come from the project `.env` file (or exported environment variables).
-# Compose refuses to start if required secrets are missing or empty.
+# Shared base definition for Crew Bench. This file is not meant to be run on
+# its own: it publishes no host ports and names no project, so pair it with
+# exactly one environment overlay.
+#
+#   ./scripts/compose.sh prod up -d --build   # production stack
+#   ./scripts/compose.sh dev  up -d --build   # debug/development stack
+#
+# Equivalent long form:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml  up -d --build
+#
+# All persistent state lives in named Docker volumes (no host bind mounts), so
+# the two stacks never share data and neither writes into the working tree.
+#
+# Secrets come from an environment file (.env, or .env.prod / .env.dev when
+# present). Compose refuses to start if required secrets are missing or empty.
 # Copy .env.example to .env and run ./scripts/generate_secrets.sh first.
 services:
   db:
@@ -9,47 +23,50 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
       POSTGRES_DB: ${POSTGRES_DB:-crewbench}
     volumes:
-      - ./db:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crewbench}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crewbench} -d ${POSTGRES_DB:-crewbench}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
     environment:
-      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATABASE_URL: postgresql://${POSTGRES_USER:-crewbench}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}@db:5432/${POSTGRES_DB:-crewbench}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set. Copy .env.example to .env and run ./scripts/generate_secrets.sh}
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3333}
+      PUBLIC_URL: ${PUBLIC_URL:-}
       ROOT_PATH: ${ROOT_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      # Point LOG_FILE at /var/log/crewbench/... to keep logs in the named volume.
       LOG_FILE: ${LOG_FILE:-}
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - backend_logs:/var/log/crewbench
 
   frontend:
     build:
       context: ./frontend
       args:
-        # Same-origin /api when behind reverse proxy (set to full URL if API is on another host)
-        REACT_APP_API_URL: ""
-        # REACT_APP_RECAPTCHA_SITE_KEY: ""  # optional, for reCAPTCHA
-    ports:
-      - "3333:80"
+        # Prefer runtime API_BASE_PATH (no rebuild). Build args are fallbacks only.
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-}
+        REACT_APP_RECAPTCHA_SITE_KEY: ${REACT_APP_RECAPTCHA_SITE_KEY:-}
+    environment:
+      # Browser API base path — change without rebuilding the frontend image.
+      #   /api       default (recommended)
+      #   /api/api   only if the outer reverse proxy strips one /api before the backend
+      API_BASE_PATH: ${API_BASE_PATH:-/api}
     depends_on:
       - backend
+
+volumes:
+  db_data:
+  backend_logs:

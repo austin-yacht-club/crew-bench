@@ -9,46 +9,75 @@ Crew Bench is a web application that matches sailing crew with boats for racing 
 - **Frontend**: React with Material-UI
 - **Infrastructure**: Docker Compose for local development
 
+### Reverse proxy / API path (do not regress)
+
+The browser must call `/api/...` for auth (e.g. `POST /api/auth/login`). In Docker this is controlled by runtime env **`API_BASE_PATH`** (default `/api`), written to `/config.js` on frontend container start — **no rebuild** to change it.
+
+- Preferred: reverse proxy sends all traffic to the frontend container; keep `API_BASE_PATH=/api`.
+- Login 404s: usually the SPA calling `/api/api` while the host expects `/api`. Run `./scripts/check_api_path.sh https://host` and fix `API_BASE_PATH` in `.env.prod`, then `./scripts/compose.sh prod up -d frontend`.
+- Do **not** reintroduce bake-time `/api/api` defaults via `REACT_APP_API_URL`.
+
 ## Development Environment
+
+### Two stacks
+
+There are two independent Compose stacks. Always work in `dev`; leave `prod` alone unless the task is about production.
+
+| | `prod` | `dev` |
+|---|---|---|
+| Compose project | `crew-bench-prod` | `crew-bench-dev` |
+| Frontend | http://localhost:3333 | http://localhost:3334 |
+| Backend API | http://localhost:8000 | http://localhost:8001 |
+| Postgres | `localhost:5432` | `localhost:5433` |
+| Database | `crewbench` | `crewbench_dev` |
+| Data volume | `crew-bench-prod-db-data` | `crew-bench-dev-db-data` |
+
+`docker-compose.yml` is a shared base that publishes no ports; it must be paired with `docker-compose.dev.yml` or `docker-compose.prod.yml`. Use the wrapper, which selects the overlay, project name and environment file:
+
+```bash
+./scripts/compose.sh <dev|prod> <docker compose args...>
+```
+
+A bare `docker compose up` does **not** start a usable stack.
 
 ### Starting the Application
 
 ```bash
 cd crew-bench
-./scripts/generate_secrets.sh   # once; creates gitignored .env
-docker compose up -d
+./scripts/generate_secrets.sh          # once; creates gitignored .env
+./scripts/compose.sh dev up -d --build
 ```
 
 ### Rebuilding After Changes
 
 ```bash
-# Rebuild all containers
-docker-compose up -d --build
+# Rebuild all containers in the debug stack
+./scripts/compose.sh dev up -d --build
 
-# Rebuild specific service
-docker-compose up -d --build frontend
-docker-compose up -d --build backend
+# Rebuild a specific service
+./scripts/compose.sh dev up -d --build frontend
+./scripts/compose.sh dev up -d --build backend
 
-# Full reset (clears database)
-docker-compose down -v && docker-compose up -d --build
+# Live code sync instead of rebuilding (Compose watch; no bind mounts)
+./scripts/compose.sh dev up -d --build --watch
+
+# Full reset of the debug database only
+./scripts/compose.sh dev down -v && ./scripts/compose.sh dev up -d --build
 ```
+
+`down -v` deletes that stack's named volumes and nothing else, so resetting `dev` cannot affect `prod`.
 
 ### Viewing Logs
 
 ```bash
-docker logs crew-bench-backend-1
-docker logs crew-bench-frontend-1
+./scripts/compose.sh dev logs -f backend
+./scripts/compose.sh dev logs -f frontend
+docker logs crew-bench-dev-backend-1
 ```
-
-### Accessing the Application
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
 
 ### Admin credentials
 
-There is no default admin password. After `./scripts/generate_secrets.sh`, use `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`. The admin must change the password on first login.
+There is no default admin password. After `./scripts/generate_secrets.sh`, use `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env` (or `.env.dev` / `.env.prod` when present). The admin must change the password on first login.
 
 ## Code Structure
 
@@ -60,7 +89,8 @@ crew-bench/
 │   ├── schemas.py       # Pydantic request/response schemas
 │   ├── auth.py          # Authentication utilities
 │   ├── settings.py      # Required secrets; fail-closed validation
-│   ├── database.py      # Database connection setup
+│   ├── database.py      # Connection setup and schema reconciliation
+│   ├── manage_schema.py # CLI: report or apply schema drift
 │   ├── calendar_importer.py  # External calendar scraping
 │   ├── requirements.txt # Python dependencies
 │   └── Dockerfile
@@ -76,9 +106,15 @@ crew-bench/
 │   ├── public/
 │   ├── package.json
 │   └── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml       # Shared base; never run on its own
+├── docker-compose.dev.yml   # Debug stack (crew-bench-dev)
+├── docker-compose.prod.yml  # Production stack (crew-bench-prod)
 ├── .env.example             # Template for required secrets (copy to .env)
-├── scripts/generate_secrets.sh
+├── scripts/
+│   ├── compose.sh               # Run compose against one stack
+│   ├── generate_secrets.sh      # Create .env / .env.dev / .env.prod
+│   ├── check_schema.sh          # Report or apply schema drift
+│   └── migrate_db_to_volume.sh  # Old ./db bind mount -> named volume
 ├── CHANGELOG.md
 ├── README.md
 └── AGENT.md
@@ -95,7 +131,15 @@ crew-bench/
 When adding new database columns:
 - Add column to the model in `models.py`
 - Add field to relevant schemas in `schemas.py`
-- Run `docker-compose down -v && docker-compose up -d --build` to recreate tables
+- Restart the backend: `./scripts/compose.sh dev up -d --build backend`
+
+`initialize_database()` in `database.py` runs at startup: it creates missing tables, then `ensure_schema_updates()` adds new columns and indexes to tables that already exist, then `validate_database_schema()` aborts startup if anything is still missing. So dropping the volume is not required for additive changes. Give new columns either `nullable=True` or a scalar default, so existing rows can be backfilled — a `NOT NULL` column with no default cannot be enforced on a populated table and is added nullable instead. Verify with:
+
+```bash
+./scripts/check_schema.sh dev check
+```
+
+Renames, type changes and drops are **not** handled automatically; do those deliberately with SQL, or reset the dev database with `./scripts/compose.sh dev down -v`.
 
 ### Frontend Changes
 
@@ -131,9 +175,10 @@ EOF
 
 ### Before Committing
 
-1. **Test the application**: Ensure `docker-compose up -d --build` succeeds
-2. **Check for errors**: Review `docker logs crew-bench-backend-1`
-3. **Verify frontend**: Check that http://localhost:3000 loads
+1. **Test the application**: Ensure `./scripts/compose.sh dev up -d --build` succeeds
+2. **Check for errors**: Review `./scripts/compose.sh dev logs backend`
+3. **Verify frontend**: Check that http://localhost:3334 loads
+4. **Run the backend tests**: `cd backend && python -m pytest tests/ -q`
 
 ## Updating the Changelog
 
@@ -191,7 +236,7 @@ Update `CHANGELOG.md` when:
 1. Add model in `backend/models.py`
 2. Add schemas in `backend/schemas.py`
 3. Add CRUD endpoints in `backend/main.py`
-4. Reset database: `docker-compose down -v && docker-compose up -d --build`
+4. Restart the backend so startup reconciliation creates the table: `./scripts/compose.sh dev up -d --build backend`
 
 ## Testing
 
@@ -211,37 +256,47 @@ Use the Swagger UI at http://localhost:8000/docs to test API endpoints directly.
 ### Database Issues
 
 ```bash
-# Reset database completely (also needed if you rotate POSTGRES_PASSWORD)
-docker compose down -v
-docker compose up -d --build
+# Reset one stack's database completely (also needed if you rotate POSTGRES_PASSWORD)
+./scripts/compose.sh dev down -v
+./scripts/compose.sh dev up -d --build
+```
+
+### "column ... does not exist"
+
+The database predates a model change. Startup reconciliation normally handles this; check what is missing and apply it without restarting:
+
+```bash
+./scripts/check_schema.sh dev check
+./scripts/check_schema.sh dev apply
 ```
 
 ### Missing secrets / Compose will not start
 
 ```bash
-# Required before the first `docker compose up`
+# Required before the first start
 ./scripts/generate_secrets.sh
 ```
 
-Compose errors about `POSTGRES_PASSWORD`, `SECRET_KEY`, or `ADMIN_PASSWORD` mean `.env` is missing or a required value is empty. Known-insecure defaults (for example `admin123`) are rejected by the backend even if set.
+Compose errors about `POSTGRES_PASSWORD`, `SECRET_KEY`, or `ADMIN_PASSWORD` mean the environment file is missing or a required value is empty. Known-insecure defaults (for example `admin123`) are rejected by the backend even if set.
 
 ### Port Already in Use
 
+Both stacks publish fixed ports. Stop the other stack, or override the port in your environment file (`DEV_FRONTEND_PORT`, `PROD_BACKEND_PORT`, ...):
+
 ```bash
-docker stop $(docker ps -aq)
-docker rm $(docker ps -aq)
-docker-compose up -d
+./scripts/compose.sh dev down
+./scripts/compose.sh dev ps        # confirm nothing is left running
 ```
 
 ### Frontend Not Updating
 
 ```bash
-docker-compose up -d --build frontend
+./scripts/compose.sh dev up -d --build frontend
 ```
 
 ### Backend Import Errors
 
 Check Python syntax and imports:
 ```bash
-docker logs crew-bench-backend-1
+./scripts/compose.sh dev logs backend
 ```

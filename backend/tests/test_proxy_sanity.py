@@ -83,3 +83,15 @@ def test_api_auth_routes_exist(client):
     # Wrong path would be 404
     r2 = client.get("/api/nonexistent")
     assert r2.status_code == 404
+
+
+def test_double_api_prefix_is_not_a_route(client):
+    """Host proxies that forward /api to the backend must not require /api/api.
+
+    The SPA default base path is /api. A leftover /api/api/... path should 404
+    on the backend so misconfigured frontends are obvious.
+    """
+    r = client.get("/api/api/auth/me")
+    assert r.status_code == 404
+    r2 = client.get("/api/api/health")
+    assert r2.status_code == 404
