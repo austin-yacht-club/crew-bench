@@ -262,7 +262,13 @@ Note that `docker compose down -v` never deleted the old bind-mount directory, s
 
 ## Database schema updates
 
-This project has no migration tool. `create_all` creates tables that are absent but never alters a table that already exists, so a database created by an older release would otherwise be permanently missing every column added since. The backend therefore reconciles the schema on startup: it creates missing tables and adds missing columns and indexes before serving any request, leaving existing rows in place and never dropping anything.
+This project has no migration tool. `create_all` creates tables that are absent but never alters a table that already exists, so a database created by an older release would otherwise be permanently missing every column added since. Startup therefore does three things in order, before serving any request:
+
+1. create tables that do not exist yet
+2. add missing columns and indexes to tables that do, leaving existing rows in place and never dropping anything
+3. validate the result, and refuse to start if any modeled table or column is still missing
+
+Step 3 keeps the guarantee that the backend never serves traffic against a schema it does not match: additive drift repairs itself, and anything else (a renamed or retyped column, a permissions problem) is a fatal startup error naming what is wrong.
 
 Inspect a running stack without changing it:
 

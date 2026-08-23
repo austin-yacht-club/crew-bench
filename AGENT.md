@@ -125,7 +125,7 @@ When adding new database columns:
 - Add field to relevant schemas in `schemas.py`
 - Restart the backend: `./scripts/compose.sh dev up -d --build backend`
 
-`ensure_schema_current()` in `database.py` runs at startup and adds new tables, columns and indexes to an existing database, so dropping the volume is not required. Give new columns either `nullable=True` or a scalar default, so existing rows can be backfilled — a `NOT NULL` column with no default cannot be enforced on a populated table and is added nullable instead. Verify with:
+`initialize_database()` in `database.py` runs at startup: it creates missing tables, then `ensure_schema_updates()` adds new columns and indexes to tables that already exist, then `validate_database_schema()` aborts startup if anything is still missing. So dropping the volume is not required for additive changes. Give new columns either `nullable=True` or a scalar default, so existing rows can be backfilled — a `NOT NULL` column with no default cannot be enforced on a populated table and is added nullable instead. Verify with:
 
 ```bash
 ./scripts/check_schema.sh dev check
