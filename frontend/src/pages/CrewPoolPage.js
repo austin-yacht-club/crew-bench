@@ -25,13 +25,15 @@ import {
   Event as EventIcon,
   CalendarMonth,
   Send,
+  Pool,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { crewPoolAPI, crewRatingsAPI } from '../services/api';
+import { crewPoolAPI, crewRatingsAPI, boatsAPI, eventsAPI } from '../services/api';
 import { useAuth } from '../services/AuthContext';
 import StarRating from '../components/StarRating';
 import ContactProfileDialog from '../components/ContactProfileDialog';
 import CrewPoolContactDialog from '../components/CrewPoolContactDialog';
+import InviteCrewDialog from '../components/InviteCrewDialog';
 
 const PATTERN_OPTIONS = [
   { value: 'saturdays', label: 'Every Saturday' },
@@ -70,8 +72,11 @@ const CrewPoolPage = () => {
   const [crewRatingSummaries, setCrewRatingSummaries] = useState({});
   const [profileDialogUserId, setProfileDialogUserId] = useState(null);
   const [contactCrewMember, setContactCrewMember] = useState(null);
+  const [boats, setBoats] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [inviteDialogCrew, setInviteDialogCrew] = useState(null);
 
-  const isSkipper = user?.role === 'skipper' || user?.is_admin;
+  const isSkipperOrAdmin = user?.role === 'skipper' || user?.is_admin;
 
   useEffect(() => {
     loadData();
@@ -97,8 +102,17 @@ const CrewPoolPage = () => {
           setIsActive(true);
         }
       } else {
-        const res = await crewPoolAPI.list();
+        const requests = [crewPoolAPI.list()];
+        if (isSkipperOrAdmin) {
+          requests.push(boatsAPI.listMy(), eventsAPI.list(true));
+        }
+        const results = await Promise.all(requests);
+        const res = results[0];
         setCrewPool(res.data || []);
+        if (isSkipperOrAdmin) {
+          setBoats(results[1]?.data || []);
+          setEvents(results[2]?.data || []);
+        }
         const crewIds = [...new Set((res.data || []).map((i) => i.crew?.id).filter(Boolean))];
         if (crewIds.length > 0) {
           try {
@@ -332,9 +346,21 @@ const CrewPoolPage = () => {
 
   const renderBrowseTab = () => (
     <Box>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        <strong>Crew Pool</strong> = general interest (patterns, notes, date ranges).
+        <strong> Event availability</strong> = marked for specific races on the Events page.
+        Use &quot;Invite to event&quot; below to send a race-day invitation that appears in their Requests inbox.
+      </Alert>
+
+      {isSkipperOrAdmin && boats.length === 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Add a boat before you can invite crew from the pool to events.
+        </Alert>
+      )}
+
       <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         Crew who are generally looking for opportunities — no event selection required.
-        For a specific race day, use Find Crew (Events).
+        For crew who already marked availability for a specific race, use Find Crew (Events).
       </Typography>
 
       <TextField
@@ -396,6 +422,25 @@ const CrewPoolPage = () => {
                       </Box>
                     </Box>
 
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+                      <Chip
+                        label="Pool interest"
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                        icon={<Pool />}
+                      />
+                      {(item.upcoming_event_count || 0) > 0 && (
+                        <Chip
+                          label={`Also marked for ${item.upcoming_event_count} event${item.upcoming_event_count === 1 ? '' : 's'}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          icon={<EventIcon />}
+                        />
+                      )}
+                    </Box>
+
                     {(item.patterns || []).length > 0 && (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
                         {item.patterns.map((p) => (
@@ -428,19 +473,30 @@ const CrewPoolPage = () => {
                       </Box>
                     )}
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                       <Button size="small" onClick={() => setProfileDialogUserId(c.id)}>
                         View profile
                       </Button>
-                      {isSkipper && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={<Send />}
-                          onClick={() => setContactCrewMember(c)}
-                        >
-                          Send message
-                        </Button>
+                      {isSkipperOrAdmin && (
+                        <>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Send />}
+                            onClick={() => setContactCrewMember(c)}
+                          >
+                            Send message
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<EventIcon />}
+                            onClick={() => setInviteDialogCrew(c)}
+                            disabled={boats.length === 0 || events.length === 0}
+                          >
+                            Invite to event
+                          </Button>
+                        </>
                       )}
                     </Box>
                   </CardContent>
@@ -490,6 +546,17 @@ const CrewPoolPage = () => {
         open={Boolean(contactCrewMember)}
         onClose={() => setContactCrewMember(null)}
         crewMember={contactCrewMember}
+      />
+
+      <InviteCrewDialog
+        open={Boolean(inviteDialogCrew)}
+        onClose={() => setInviteDialogCrew(null)}
+        crewMember={inviteDialogCrew}
+        boats={boats}
+        events={events}
+        source="pool"
+        onSuccess={(msg) => setSuccess(msg)}
+        onError={(msg) => setError(msg)}
       />
     </Box>
   );
