@@ -20,6 +20,13 @@ from log_config import configure_logging
 
 logger = configure_logging("crew_bench")
 
+# Reverse proxy / sub-path deployment (e.g. Cloudflare Zero Trust)
+# IMPORTANT: Do NOT set ROOT_PATH=/api. Our routes are already declared as
+# /api/..., and FastAPI/Starlette 0.109+ strip root_path before route matching,
+# which turns /api/auth/login into /auth/login and 404s every API call.
+# Leave ROOT_PATH empty; nginx + RootPathRewriteMiddleware handle pathing.
+# Use PUBLIC_URL for public links / OpenAPI server URL instead.
+_ROOT_PATH_RAW = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
 # Sanitize ROOT_PATH before FastAPI() — a value of /api breaks all /api/* routes.
 ROOT_PATH = _ROOT_PATH_RAW
 if ROOT_PATH == "/api":
@@ -32,13 +39,6 @@ if ROOT_PATH == "/api":
 elif ROOT_PATH:
     logger.info("Root path (OpenAPI only): %s", ROOT_PATH)
 
-# Reverse proxy / sub-path deployment (e.g. Cloudflare Zero Trust)
-# IMPORTANT: Do NOT set ROOT_PATH=/api. Our routes are already declared as
-# /api/..., and FastAPI/Starlette 0.109+ strip root_path before route matching,
-# which turns /api/auth/login into /auth/login and 404s every API call.
-# Leave ROOT_PATH empty; nginx + RootPathRewriteMiddleware handle pathing.
-# Use PUBLIC_URL for public links / OpenAPI server URL instead.
-_ROOT_PATH_RAW = (os.getenv("ROOT_PATH") or "").strip().rstrip("/")
 PUBLIC_URL = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
 CORS_ORIGINS_ENV = (os.getenv("CORS_ORIGINS") or "").strip()
 from models import User, Boat, Event, CrewRequest, CrewAvailability, RequestStatus, Fleet, SkipperCommitment, CrewRating, BoatRating, Notification, PushSubscription, FavoriteBoat, CrewInterest, Conversation, DirectMessage, ConversationSource, Motd, MotdDismissal, MotdLocation
