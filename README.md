@@ -433,7 +433,7 @@ Secrets are read from a project-root environment file (gitignored) or from the p
 - `LOG_MAX_BYTES` - Max bytes per log file when using LOG_FILE (default: 5MB).
 - `LOG_BACKUP_COUNT` - Number of backup log files to keep (default: 3).
 - `PUBLIC_URL` - Public URL of the app (e.g. `https://app.example.com`). When set, this is logged at startup and included in request log lines so logs reflect the reverse-proxy URL.
-- `ROOT_PATH` - Root path when the API is served behind a reverse proxy at a sub-path (used for OpenAPI docs).
+- `ROOT_PATH` - **Leave unset/empty.** Do not set to `/api`. On FastAPI 0.109+, `root_path=/api` strips `/api` before route matching so `/api/auth/login` becomes `/auth/login` and **every API call 404s** (including login). Pathing is handled by frontend nginx + `RootPathRewriteMiddleware`. Use `PUBLIC_URL` for the public site URL instead.
 - `CORS_ORIGINS` - Comma-separated list of allowed CORS origins. The origin derived from `PUBLIC_URL` is automatically allowed when set.
 
 ### Frontend
@@ -477,6 +477,13 @@ Do **not** bake `/api/api` into the image; that is how login 404s came back befo
 ### Backend
 
 Set `PUBLIC_URL` to the public base URL (e.g. `https://yourapp.com`). Optionally set `CORS_ORIGINS`.
+
+**Do not set `ROOT_PATH=/api`.** Production used to default to that and it 404s all `/api/*` routes on FastAPI 0.109+ (login included). If your `.env` still has `ROOT_PATH=/api`, remove it and recreate the backend:
+
+```bash
+# remove ROOT_PATH=/api from .env / .env.prod
+./scripts/compose.sh prod up -d backend
+```
 
 ### Diagnose login/register 404
 

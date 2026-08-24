@@ -95,3 +95,25 @@ def test_double_api_prefix_is_not_a_route(client):
     assert r.status_code == 404
     r2 = client.get("/api/api/health")
     assert r2.status_code == 404
+
+
+def test_root_path_api_does_not_break_login_matching():
+    """Regression: FastAPI(root_path='/api') strips /api before matching.
+
+    With routes declared as /api/auth/login, root_path=/api made every API call
+    404 (seen in production behind Cloudflare → frontend nginx). Crew Bench must
+    leave root_path empty so /api/auth/login matches.
+    """
+    from starlette.routing import get_route_path
+    from main import app, ROOT_PATH
+
+    assert ROOT_PATH in ("", None) or ROOT_PATH != "/api"
+    # How Starlette would match if root_path were wrongly set to /api:
+    broken = get_route_path({"type": "http", "path": "/api/auth/login", "root_path": "/api"})
+    assert broken == "/auth/login"
+    # With empty root_path, the full route path is preserved:
+    ok = get_route_path({"type": "http", "path": "/api/auth/login", "root_path": ROOT_PATH or ""})
+    assert ok == "/api/auth/login"
+    # And the app actually has the login route mounted:
+    paths = {getattr(r, "path", None) for r in app.routes}
+    assert "/api/auth/login" in paths

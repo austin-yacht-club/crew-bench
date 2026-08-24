@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Login 404 with correct `/api/auth/login` path**: Production default `ROOT_PATH=/api` made FastAPI/Starlette strip `/api` before route matching, so `/api/auth/login` was matched as `/auth/login` and 404'd. Default is now empty; `ROOT_PATH=/api` is ignored with a warning. Recreate backend after pull (or clear `ROOT_PATH` in `.env` immediately).
 - **Login/register 404 behind reverse proxy**: Empty API base again uses same-origin `/api/...` instead of `/api/api/...`. Host proxies that forward `/api` to the backend without stripping were hitting non-existent `/api/api/auth/*` routes.
 - **First-class API path config**: Runtime `API_BASE_PATH` (default `/api`) is written into `/config.js` on frontend container start — change pathing with `./scripts/compose.sh prod up -d frontend`, no image rebuild. `scripts/check_api_path.sh` verifies the public URL matches what the SPA will call.
 - **Database startup**: The backend now exits with an actionable fatal error when PostgreSQL is unreachable, credentials do not match a persisted database, a schema patch fails, or an existing schema is missing a modeled table or column.
