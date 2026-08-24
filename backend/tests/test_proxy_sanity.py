@@ -97,6 +97,14 @@ def test_double_api_prefix_is_not_a_route(client):
     assert r2.status_code == 404
 
 
+def test_main_defines_root_path_raw_before_use():
+    """Regression: PR #15 referenced _ROOT_PATH_RAW before assignment (NameError on boot)."""
+    import main
+
+    assert hasattr(main, "_ROOT_PATH_RAW")
+    assert main.ROOT_PATH != "/api"
+
+
 def test_root_path_api_does_not_break_login_matching():
     """Regression: FastAPI(root_path='/api') strips /api before matching.
 
