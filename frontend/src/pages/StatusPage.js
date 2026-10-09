@@ -35,7 +35,8 @@ import {
   Sailing,
 } from '@mui/icons-material';
 import { format, isFuture, isPast } from 'date-fns';
-import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI, boatRatingsAPI, crewRatingsAPI } from '../services/api';
+import { crewRequestsAPI, boatsAPI, skipperCommitmentsAPI, boatRatingsAPI, crewRatingsAPI, raceCommitteeAPI, getAPIErrorMessage } from '../services/api';
+import { rcStatusLabel } from '../constants/raceCommittee';
 import { useAuth } from '../services/AuthContext';
 import StarRating from '../components/StarRating';
 import ContactProfileDialog from '../components/ContactProfileDialog';
@@ -63,6 +64,7 @@ const StatusPage = () => {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [profileUserId, setProfileUserId] = useState(null);
+  const [rcDuties, setRcDuties] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -95,20 +97,34 @@ const StatusPage = () => {
 
   const loadData = async () => {
     try {
-      const [receivedRes, sentRes, boatsRes, commitmentsRes] = await Promise.all([
+      const [receivedRes, sentRes, boatsRes, commitmentsRes, rcRes] = await Promise.all([
         crewRequestsAPI.getReceived(),
         crewRequestsAPI.getSent(),
         boatsAPI.listMy(),
         skipperCommitmentsAPI.getMy(),
+        raceCommitteeAPI.mine(),
       ]);
       setReceivedRequests(receivedRes.data);
       setSentRequests(sentRes.data);
       setMyBoats(boatsRes.data);
       setSkipperCommitments(commitmentsRes.data);
+      setRcDuties(rcRes.data);
     } catch (err) {
       setError('Failed to load status data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRcAction = async (action, id) => {
+    setError('');
+    setSuccess('');
+    try {
+      await raceCommitteeAPI[action](id);
+      setSuccess(action === 'accept' ? 'Race committee invitation accepted' : action === 'decline' ? 'Race committee invitation declined' : 'Race committee duty withdrawn');
+      await loadData();
+    } catch (err) {
+      setError(getAPIErrorMessage(err, 'Could not update race committee duty'));
     }
   };
 
@@ -320,6 +336,48 @@ const StatusPage = () => {
         <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
           {success}
         </Alert>
+      )}
+
+      <Typography variant="h6" sx={{ mb: 1 }}>Race committee</Typography>
+      {rcDuties.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Volunteer from a race, or accept an invitation, and the duty shows up here.
+        </Typography>
+      ) : (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {rcDuties.map((duty) => {
+            const upcoming = isFuture(new Date(duty.event_date));
+            const invite = duty.status === 'pending' && duty.assigned_role;
+            return (
+              <Grid item xs={12} md={6} key={duty.id}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1">{duty.event_name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {format(new Date(duty.event_date), 'EEEE, MMMM d, yyyy')}
+                      {duty.fleet_name ? ` · ${duty.fleet_name}` : ''}
+                    </Typography>
+                    <Chip label={rcStatusLabel(duty)} size="small" sx={{ mt: 1, mr: 1 }} color={duty.status === 'accepted' ? 'success' : 'default'} />
+                    {duty.assigned_role && duty.status === 'accepted' && (
+                      <Chip label={duty.assigned_role} size="small" sx={{ mt: 1 }} variant="outlined" />
+                    )}
+                    <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                      {invite && (
+                        <>
+                          <Button size="small" variant="contained" onClick={() => handleRcAction('accept', duty.id)}>Accept</Button>
+                          <Button size="small" color="warning" onClick={() => handleRcAction('decline', duty.id)}>Decline</Button>
+                        </>
+                      )}
+                      {upcoming && (duty.status === 'accepted' || (duty.status === 'pending' && !duty.assigned_role)) && (
+                        <Button size="small" color="warning" onClick={() => handleRcAction('withdraw', duty.id)}>Withdraw</Button>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
       )}
 
       <Grid container spacing={2} sx={{ mb: 3 }}>

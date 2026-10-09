@@ -212,6 +212,20 @@ export const adminAPI = {
   previewCalendar: (url) => api.get('/admin/calendar-preview', { params: { url } }),
   listMotds: () => api.get('/admin/motd'),
   updateMotd: (location, data) => api.put(`/admin/motd/${location}`, data),
+  listFleetOrganizers: () => api.get('/admin/fleet-organizers'),
+  addFleetOrganizer: (fleetId, userId) => api.post(`/admin/fleets/${fleetId}/organizers`, { user_id: userId }),
+  removeFleetOrganizer: (fleetId, userId) => api.delete(`/admin/fleets/${fleetId}/organizers/${userId}`),
+};
+
+export const raceCommitteeAPI = {
+  getBoard: (eventId) => api.get(`/events/${eventId}/race-committee`),
+  volunteer: (eventId, data) => api.post(`/events/${eventId}/race-committee/volunteer`, data),
+  assign: (eventId, data) => api.post(`/events/${eventId}/race-committee/assign`, data),
+  candidates: (eventId) => api.get(`/events/${eventId}/race-committee/candidates`),
+  mine: () => api.get('/race-committee/my'),
+  accept: (id) => api.post(`/race-committee/${id}/accept`),
+  decline: (id) => api.post(`/race-committee/${id}/decline`),
+  withdraw: (id) => api.post(`/race-committee/${id}/withdraw`),
 };
 
 export default api;

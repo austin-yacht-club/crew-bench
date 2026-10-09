@@ -27,6 +27,41 @@ class ExperienceLevel(str, enum.Enum):
     EXPERT = "expert"
 
 
+# Race committee jobs. Mark-set is who can manage the mark-set boats.
+RC_ROLES = (
+    "PRO",
+    "Signal boat",
+    "Finish boat",
+    "Scorer",
+    "Safety",
+    "Mark-set",
+)
+
+
+def split_rc_roles(value):
+    if not value:
+        return []
+    return [part.strip() for part in str(value).split(",") if part.strip()]
+
+
+def normalize_rc_roles(value):
+    """Comma-separated catalog roles, or None when empty.
+
+    Raises ValueError for a role that is not in RC_ROLES.
+    """
+    if value is None:
+        return None
+    roles = []
+    seen = set()
+    for role in split_rc_roles(value):
+        if role not in RC_ROLES:
+            raise ValueError(f"Unknown race committee role: {role}")
+        if role not in seen:
+            seen.add(role)
+            roles.append(role)
+    return ", ".join(roles) or None
+
+
 event_boats = Table(
     'event_boats',
     Base.metadata,
@@ -67,6 +102,9 @@ class User(Base):
     contact_preference = Column(String, default=ContactPreference.EMAIL.value)
     crew_pool_email_alerts = Column(Boolean, default=False)
     last_crew_pool_alert_at = Column(DateTime, nullable=True)
+    rc_roles = Column(Text)  # Comma-separated RC_ROLES values
+    rc_training = Column(Text)
+    rc_experience = Column(Text)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     must_change_password = Column(Boolean, default=False)
@@ -88,6 +126,7 @@ class Fleet(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     boats = relationship("Boat", back_populates="fleet")
+    organizers = relationship("FleetOrganizer", back_populates="fleet")
 
 
 class Boat(Base):
@@ -129,11 +168,55 @@ class Event(Base):
     external_url = Column(String)
     imported_from = Column(String)  # Source if imported
     is_active = Column(Boolean, default=True)
+    organizing_fleet_id = Column(Integer, ForeignKey("fleets.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by_id = Column(Integer, ForeignKey("users.id"))
     
     boats = relationship("Boat", secondary=event_boats, back_populates="events")
     crew_availabilities = relationship("CrewAvailability", back_populates="event")
+    organizing_fleet = relationship("Fleet", foreign_keys=[organizing_fleet_id])
+    race_committee_assignments = relationship(
+        "RaceCommitteeAssignment",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+
+
+class FleetOrganizer(Base):
+    """A person an admin named to staff race committee for one fleet."""
+    __tablename__ = "fleet_organizers"
+    __table_args__ = (
+        UniqueConstraint("fleet_id", "user_id", name="uq_fleet_organizer"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    fleet_id = Column(Integer, ForeignKey("fleets.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    fleet = relationship("Fleet", back_populates="organizers")
+    user = relationship("User")
+
+
+class RaceCommitteeAssignment(Base):
+    """One person's race-committee offer or duty for one race."""
+    __tablename__ = "race_committee_assignments"
+    __table_args__ = (
+        UniqueConstraint("event_id", "user_id", name="uq_rc_assignment_event_user"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    preferred_roles = Column(Text)  # Comma-separated roles they offered
+    assigned_role = Column(String, nullable=True)
+    status = Column(String, default=RequestStatus.PENDING.value, nullable=False)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    responded_at = Column(DateTime)
+
+    event = relationship("Event", back_populates="race_committee_assignments")
+    user = relationship("User")
 
 
 class AvailabilityType(str, enum.Enum):

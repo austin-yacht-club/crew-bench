@@ -113,6 +113,24 @@ const ContactProfileDialog = ({ open, onClose, userId, source = 'contact' }) => 
                 )}
               </Box>
             )}
+            {profile.rc_roles && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Race committee
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                  {profile.rc_roles.split(',').map((role) => (
+                    <Chip key={role} label={role.trim()} size="small" color="primary" variant="outlined" />
+                  ))}
+                </Box>
+                {profile.rc_training && (
+                  <Typography variant="body2">Training: {profile.rc_training}</Typography>
+                )}
+                {profile.rc_experience && (
+                  <Typography variant="body2">Experience: {profile.rc_experience}</Typography>
+                )}
+              </Box>
+            )}
             {profile.position_preferences && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>

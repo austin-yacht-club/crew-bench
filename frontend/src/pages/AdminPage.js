@@ -45,7 +45,7 @@ import {
   Campaign,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { eventsAPI, adminAPI } from '../services/api';
+import { eventsAPI, adminAPI, fleetsAPI, getAPIErrorMessage } from '../services/api';
 import { useMotd } from '../services/MotdContext';
 
 const MOTD_FIELDS = [
@@ -96,6 +96,7 @@ const AdminPage = () => {
     event_type: 'race',
     series: '',
     external_url: '',
+    organizing_fleet_id: '',
   });
 
   const [userDialogOpen, setUserDialogOpen] = useState(false);
@@ -112,6 +113,10 @@ const AdminPage = () => {
 
   const [motdForms, setMotdForms] = useState(emptyMotdForms);
   const [motdSaving, setMotdSaving] = useState({});
+  const [fleets, setFleets] = useState([]);
+  const [organizers, setOrganizers] = useState([]);
+  const [newFleetName, setNewFleetName] = useState('');
+  const [leadUserByFleet, setLeadUserByFleet] = useState({});
 
   useEffect(() => {
     loadData();
@@ -125,12 +130,16 @@ const AdminPage = () => {
 
   const loadData = async () => {
     try {
-      const [eventsRes, usersRes] = await Promise.all([
+      const [eventsRes, usersRes, fleetsRes, organizersRes] = await Promise.all([
         eventsAPI.list(false),
         adminAPI.listUsers(),
+        fleetsAPI.list(),
+        adminAPI.listFleetOrganizers(),
       ]);
       setEvents(eventsRes.data);
       setUsers(usersRes.data);
+      setFleets(fleetsRes.data);
+      setOrganizers(organizersRes.data);
     } catch (err) {
       setError('Failed to load data');
     } finally {
@@ -212,6 +221,7 @@ const AdminPage = () => {
         event_type: event.event_type || 'race',
         series: event.series || '',
         external_url: event.external_url || '',
+        organizing_fleet_id: event.organizing_fleet_id || '',
       });
     } else {
       setEditingEvent(null);
@@ -224,6 +234,7 @@ const AdminPage = () => {
         event_type: 'race',
         series: '',
         external_url: '',
+        organizing_fleet_id: '',
       });
     }
     setEventDialogOpen(true);
@@ -232,6 +243,8 @@ const AdminPage = () => {
   const handleSaveEvent = async () => {
     try {
       const data = { ...eventForm };
+      const fleetId = data.organizing_fleet_id ? Number(data.organizing_fleet_id) : null;
+      delete data.organizing_fleet_id;
       if (data.date) data.date = new Date(data.date).toISOString();
       if (data.end_date) data.end_date = new Date(data.end_date).toISOString();
       else delete data.end_date;
@@ -239,6 +252,9 @@ const AdminPage = () => {
       Object.keys(data).forEach(key => {
         if (data[key] === '') delete data[key];
       });
+      if (editingEvent || fleetId) {
+        data.organizing_fleet_id = fleetId;
+      }
 
       if (editingEvent) {
         await eventsAPI.update(editingEvent.id, data);
@@ -285,6 +301,45 @@ const AdminPage = () => {
       loadData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update user');
+    }
+  };
+
+  const handleCreateFleet = async () => {
+    const name = newFleetName.trim();
+    if (!name) return;
+    setError('');
+    try {
+      await fleetsAPI.create({ name });
+      setNewFleetName('');
+      setSuccess(`Fleet ${name} created`);
+      loadData();
+    } catch (err) {
+      setError(getAPIErrorMessage(err, 'Failed to create fleet'));
+    }
+  };
+
+  const handleAddLead = async (fleetId) => {
+    const userId = Number(leadUserByFleet[fleetId]);
+    if (!userId) return;
+    setError('');
+    try {
+      await adminAPI.addFleetOrganizer(fleetId, userId);
+      setLeadUserByFleet({ ...leadUserByFleet, [fleetId]: '' });
+      setSuccess('RC lead added');
+      loadData();
+    } catch (err) {
+      setError(getAPIErrorMessage(err, 'Failed to add RC lead'));
+    }
+  };
+
+  const handleRemoveLead = async (fleetId, userId) => {
+    setError('');
+    try {
+      await adminAPI.removeFleetOrganizer(fleetId, userId);
+      setSuccess('RC lead removed');
+      loadData();
+    } catch (err) {
+      setError(getAPIErrorMessage(err, 'Failed to remove RC lead'));
     }
   };
 
@@ -339,6 +394,7 @@ const AdminPage = () => {
         <Tab icon={<CloudDownload />} label="Import" iconPosition="start" />
         <Tab icon={<People />} label="Users" iconPosition="start" />
         <Tab icon={<Campaign />} label="Messages" iconPosition="start" />
+        <Tab label="RC leads" />
       </Tabs>
 
       {tab === 0 && (
@@ -361,6 +417,7 @@ const AdminPage = () => {
                   <TableCell>Date</TableCell>
                   <TableCell>Type</TableCell>
                   <TableCell>Series</TableCell>
+                  <TableCell>Committee fleet</TableCell>
                   <TableCell>Source</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -376,6 +433,7 @@ const AdminPage = () => {
                       <Chip label={event.event_type || 'race'} size="small" />
                     </TableCell>
                     <TableCell>{event.series || '-'}</TableCell>
+                    <TableCell>{event.organizing_fleet?.name || '-'}</TableCell>
                     <TableCell>
                       {event.imported_from ? (
                         <Chip label="Imported" size="small" variant="outlined" />
@@ -638,6 +696,76 @@ const AdminPage = () => {
         </Grid>
       )}
 
+      {tab === 4 && (
+        <Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            RC leads staff the committee for races organized by their fleet. They can assign the PRO.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 3, maxWidth: 480 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="New fleet name"
+              value={newFleetName}
+              onChange={(e) => setNewFleetName(e.target.value)}
+            />
+            <Button variant="contained" onClick={handleCreateFleet} disabled={!newFleetName.trim()}>
+              Create
+            </Button>
+          </Box>
+          {fleets.length === 0 && (
+            <Typography variant="body2" color="text.secondary">No fleets yet.</Typography>
+          )}
+          <Grid container spacing={2}>
+            {fleets.map((fleet) => {
+              const leads = organizers.filter((row) => row.fleet_id === fleet.id);
+              return (
+                <Grid item xs={12} md={6} key={fleet.id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>{fleet.name}</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                        {leads.length === 0 && (
+                          <Typography variant="body2" color="text.secondary">No RC leads</Typography>
+                        )}
+                        {leads.map((lead) => (
+                          <Chip
+                            key={lead.id}
+                            label={lead.user_name}
+                            onDelete={() => handleRemoveLead(fleet.id, lead.user_id)}
+                          />
+                        ))}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Person</InputLabel>
+                          <Select
+                            label="Person"
+                            value={leadUserByFleet[fleet.id] || ''}
+                            onChange={(e) => setLeadUserByFleet({ ...leadUserByFleet, [fleet.id]: e.target.value })}
+                          >
+                            {users.filter((person) => !leads.some((lead) => lead.user_id === person.id)).map((person) => (
+                              <MenuItem key={person.id} value={person.id}>{person.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Button
+                          variant="outlined"
+                          disabled={!leadUserByFleet[fleet.id]}
+                          onClick={() => handleAddLead(fleet.id)}
+                        >
+                          Add
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      )}
+
       <Dialog open={eventDialogOpen} onClose={() => setEventDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingEvent ? 'Edit Event' : 'Create Event'}</DialogTitle>
         <DialogContent>
@@ -704,6 +832,24 @@ const AdminPage = () => {
                 value={eventForm.external_url}
                 onChange={(e) => setEventForm({ ...eventForm, external_url: e.target.value })}
               />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Organizing fleet</InputLabel>
+                <Select
+                  label="Organizing fleet"
+                  value={eventForm.organizing_fleet_id || ''}
+                  onChange={(e) => setEventForm({ ...eventForm, organizing_fleet_id: e.target.value })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {fleets.map((fleet) => (
+                    <MenuItem key={fleet.id} value={fleet.id}>{fleet.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary">
+                This fleet's RC leads staff the committee for this race.
+              </Typography>
             </Grid>
             <Grid item xs={12}>
               <TextField

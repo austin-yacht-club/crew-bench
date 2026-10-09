@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import { Person, Save, ContactMail, PhotoCamera, Delete, Lock, VpnKey, Email } from '@mui/icons-material';
 import { useAuth } from '../services/AuthContext';
+import { RC_ROLES, parseRcRoles } from '../constants/raceCommittee';
 
 const ProfilePage = () => {
   const { user, updateUser, mustChangePassword, changePassword } = useAuth();
@@ -43,6 +44,9 @@ const ProfilePage = () => {
     weight: user?.weight || '',
     certifications: user?.certifications || '',
     position_preferences: user?.position_preferences || '',
+    rc_roles: user?.rc_roles || '',
+    rc_training: user?.rc_training || '',
+    rc_experience: user?.rc_experience || '',
     profile_picture: user?.profile_picture || null,
     allow_email_contact: user?.allow_email_contact ?? true,
     allow_phone_contact: user?.allow_phone_contact ?? false,
@@ -387,6 +391,57 @@ const ProfilePage = () => {
                         );
                       })}
                     </Box>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Race committee roles
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Mark-set is who can manage the mark-set boats. Training is required before you can volunteer.
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {RC_ROLES.map((role) => {
+                        const selected = parseRcRoles(formData.rc_roles).includes(role);
+                        return (
+                          <Chip
+                            key={role}
+                            label={role}
+                            onClick={() => {
+                              const current = parseRcRoles(formData.rc_roles);
+                              const next = selected
+                                ? current.filter((item) => item !== role)
+                                : [...current, role];
+                              setFormData({ ...formData, rc_roles: next.join(', ') });
+                            }}
+                            color={selected ? 'primary' : 'default'}
+                            variant={selected ? 'filled' : 'outlined'}
+                            sx={{ cursor: 'pointer' }}
+                          />
+                        );
+                      })}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Race committee training"
+                      name="rc_training"
+                      value={formData.rc_training}
+                      onChange={handleChange}
+                      placeholder="Race Committee Fundamentals, club RC day, ..."
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Race committee experience"
+                      name="rc_experience"
+                      value={formData.rc_experience}
+                      onChange={handleChange}
+                      multiline
+                      rows={2}
+                      placeholder="Optional"
+                    />
                   </Grid>
                   <Grid item xs={12}>
                     <TextField

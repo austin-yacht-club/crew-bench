@@ -261,6 +261,9 @@ def _filter_contact_fields(user: User) -> dict:
         "weight": user.weight,
         "certifications": user.certifications,
         "position_preferences": user.position_preferences,
+        "rc_roles": user.rc_roles,
+        "rc_training": user.rc_training,
+        "rc_experience": user.rc_experience,
         "profile_picture": user.profile_picture,
         "allow_email_contact": user.allow_email_contact,
         "allow_phone_contact": user.allow_phone_contact,
@@ -734,6 +737,10 @@ def create_event(
     current_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
+    if event.organizing_fleet_id is not None:
+        fleet = db.query(Fleet).filter(Fleet.id == event.organizing_fleet_id).first()
+        if not fleet:
+            raise HTTPException(status_code=400, detail="Fleet not found")
     db_event = Event(**event.model_dump(), created_by_id=current_user.id)
     db.add(db_event)
     db.commit()
@@ -748,7 +755,7 @@ def list_events(
     upcoming_only: bool = False,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Event).filter(Event.is_active == True)
+    query = db.query(Event).options(joinedload(Event.organizing_fleet)).filter(Event.is_active == True)
     if upcoming_only:
         query = query.filter(Event.date >= datetime.utcnow())
     events = query.order_by(Event.date).offset(skip).limit(limit).all()
@@ -757,7 +764,12 @@ def list_events(
 
 @app.get("/api/events/{event_id}", response_model=schemas.Event)
 def get_event(event_id: int, db: Session = Depends(get_db)):
-    event = db.query(Event).filter(Event.id == event_id).first()
+    event = (
+        db.query(Event)
+        .options(joinedload(Event.organizing_fleet))
+        .filter(Event.id == event_id)
+        .first()
+    )
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
@@ -775,6 +787,10 @@ def update_event(
         raise HTTPException(status_code=404, detail="Event not found")
     
     update_data = event_update.model_dump(exclude_unset=True)
+    if "organizing_fleet_id" in update_data and update_data["organizing_fleet_id"] is not None:
+        fleet = db.query(Fleet).filter(Fleet.id == update_data["organizing_fleet_id"]).first()
+        if not fleet:
+            raise HTTPException(status_code=400, detail="Fleet not found")
     for field, value in update_data.items():
         setattr(event, field, value)
     db.commit()
@@ -2222,3 +2238,8 @@ def admin_update_motd(
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+from race_committee import router as race_committee_router
+
+app.include_router(race_committee_router)

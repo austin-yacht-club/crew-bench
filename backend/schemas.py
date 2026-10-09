@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional, List
-from models import UserRole, ExperienceLevel, RequestStatus, MotdLocation
+from models import UserRole, ExperienceLevel, RequestStatus, MotdLocation, normalize_rc_roles
 
 
 class UserBase(BaseModel):
@@ -20,6 +20,9 @@ class UserBase(BaseModel):
     allow_sms_contact: Optional[bool] = False
     contact_preference: Optional[str] = "email"
     crew_pool_email_alerts: Optional[bool] = False
+    rc_roles: Optional[str] = None
+    rc_training: Optional[str] = None
+    rc_experience: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -46,6 +49,16 @@ class UserUpdate(BaseModel):
     allow_sms_contact: Optional[bool] = None
     contact_preference: Optional[str] = None
     crew_pool_email_alerts: Optional[bool] = None
+    rc_roles: Optional[str] = None
+    rc_training: Optional[str] = None
+    rc_experience: Optional[str] = None
+
+    @field_validator("rc_roles")
+    @classmethod
+    def check_rc_roles(cls, value):
+        if value is None:
+            return None
+        return normalize_rc_roles(value)
 
 
 class AdminUserUpdate(UserUpdate):
@@ -145,7 +158,7 @@ class EventBase(BaseModel):
 
 
 class EventCreate(EventBase):
-    pass
+    organizing_fleet_id: Optional[int] = None
 
 
 class EventUpdate(BaseModel):
@@ -160,11 +173,14 @@ class EventUpdate(BaseModel):
     series_total: Optional[int] = None
     external_url: Optional[str] = None
     is_active: Optional[bool] = None
+    organizing_fleet_id: Optional[int] = None
 
 
 class Event(EventBase):
     id: int
     is_active: bool
+    organizing_fleet_id: Optional[int] = None
+    organizing_fleet: Optional[Fleet] = None
     created_at: datetime
     imported_from: Optional[str] = None
     
@@ -423,6 +439,9 @@ class CrewPoolProfile(BaseModel):
     weight: Optional[int] = None
     certifications: Optional[str] = None
     position_preferences: Optional[str] = None
+    rc_roles: Optional[str] = None
+    rc_training: Optional[str] = None
+    rc_experience: Optional[str] = None
     profile_picture: Optional[str] = None
     allow_email_contact: Optional[bool] = True
     allow_phone_contact: Optional[bool] = False
@@ -505,3 +524,72 @@ class Conversation(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RaceCommitteeVolunteerCreate(BaseModel):
+    preferred_roles: List[str] = Field(min_length=1)
+    notes: Optional[str] = None
+
+
+class RaceCommitteeAssign(BaseModel):
+    user_id: int
+    assigned_role: str
+
+
+class RaceCommitteePerson(BaseModel):
+    id: int
+    event_id: int
+    user_id: int
+    user_name: str
+    preferred_roles: List[str] = []
+    assigned_role: Optional[str] = None
+    status: str
+    notes: Optional[str] = None
+    rc_training: Optional[str] = None
+    rc_experience: Optional[str] = None
+    profile_roles: List[str] = []
+    same_day_sailing: bool = False
+    created_at: datetime
+
+
+class RaceCommitteeBoard(BaseModel):
+    event_id: int
+    organizing_fleet_id: Optional[int] = None
+    organizing_fleet_name: Optional[str] = None
+    can_staff: bool
+    my_assignment: Optional[RaceCommitteePerson] = None
+    assignments: List[RaceCommitteePerson] = []
+
+
+class RaceCommitteeCandidate(BaseModel):
+    id: int
+    name: str
+    rc_roles: List[str] = []
+    rc_training: Optional[str] = None
+    rc_experience: Optional[str] = None
+    same_day_sailing: bool = False
+
+
+class MyRaceCommitteeDuty(BaseModel):
+    id: int
+    event_id: int
+    event_name: str
+    event_date: datetime
+    fleet_name: Optional[str] = None
+    preferred_roles: List[str] = []
+    assigned_role: Optional[str] = None
+    status: str
+    notes: Optional[str] = None
+
+
+class FleetOrganizerCreate(BaseModel):
+    user_id: int
+
+
+class FleetOrganizerOut(BaseModel):
+    id: int
+    fleet_id: int
+    fleet_name: str
+    user_id: int
+    user_name: str
+    user_email: str
