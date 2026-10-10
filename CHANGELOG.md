@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Race committee**: People record PRO, Signal boat, Finish boat, Scorer, Safety, and Mark-set skills plus training and experience on their profile. They can volunteer for any race. An admin names one organizing fleet per race and that fleet's RC leads. Those leads, and the PRO assigned to the race, staff the committee. Assignments and acceptances show on My Schedule and as in-app notifications.
+
 - **Messages of the day**: Admins can post a short MOTD for the landing page, login page, and the rest of the app. Each banner is prefixed with the date it was last saved. Signed-in users can dismiss a MOTD with an X; it reappears if the admin updates it.
 #### Separate debug and production stacks
 - **`docker-compose.dev.yml` / `docker-compose.prod.yml`**: `docker-compose.yml` is now a shared base paired with one environment overlay. Each overlay is its own Compose project (`crew-bench-dev` / `crew-bench-prod`) with its own host ports, database and volumes, so development never disturbs production.

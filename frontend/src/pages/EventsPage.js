@@ -60,6 +60,7 @@ import {
   isToday,
 } from 'date-fns';
 import { eventsAPI, availabilityAPI, boatsAPI, fleetsAPI, seriesAPI, skipperCommitmentsAPI, favoriteBoatsAPI } from '../services/api';
+import RaceCommitteeDialog from '../components/RaceCommitteeDialog';
 import { useAuth } from '../services/AuthContext';
 
 const EventsPage = () => {
@@ -86,6 +87,7 @@ const EventsPage = () => {
   const [skipperCommitments, setSkipperCommitments] = useState([]);
   const [favoriteBoats, setFavoriteBoats] = useState([]);
   const [favoriteBoatIds, setFavoriteBoatIds] = useState(new Set());
+  const [rcEvent, setRcEvent] = useState(null);
 
   const filteredEvents = useMemo(() => {
     let filtered = events;
@@ -394,6 +396,11 @@ const EventsPage = () => {
                 </Typography>
               </Box>
             )}
+            {event.organizing_fleet && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Committee fleet: {event.organizing_fleet.name}
+              </Typography>
+            )}
             {event.description && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                 {event.description}
@@ -419,6 +426,16 @@ const EventsPage = () => {
                 sx={{ mr: 1 }}
               >
                 Details
+              </Button>
+            )}
+            {user && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setRcEvent(event)}
+                sx={{ mr: 1, mb: 1 }}
+              >
+                Race committee
               </Button>
             )}
             {user && (
@@ -480,6 +497,12 @@ const EventsPage = () => {
           {success}
         </Alert>
       )}
+
+      <RaceCommitteeDialog
+        open={Boolean(rcEvent)}
+        event={rcEvent}
+        onClose={() => setRcEvent(null)}
+      />
 
       {events.length === 0 ? (
         <Card>
